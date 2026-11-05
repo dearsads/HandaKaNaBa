@@ -66,7 +66,6 @@ namespace HandaKaNaBa
         }
 
         private static Font Impact(float size) => new Font("Impact", size);
-        private static Font Segoe(float size, FontStyle style = FontStyle.Bold) => new Font("Segoe UI", size, style);
 
         // comic-style na tuldok sa background
         private void Halftone(object sender, PaintEventArgs e)
@@ -91,8 +90,6 @@ namespace HandaKaNaBa
         private void BuildMenu()
         {
             menuPanel = MakePanel(Cyan, Point.Empty, Size.Empty, DockStyle.Fill);
-            MakeLabel(menuPanel, "HANDA KA NA BA?", 64, 50, 480, 90, Impact(44), Color.White).ForeColor = Pink;
-            MakeLabel(menuPanel, "PUMILI NG SAKUNA", 154, 160, 300, 34, Impact(16), Ink).ForeColor = Color.White;
 
             string[] names = { "TSUNAMI\n\nEASY", "LINDOL\n\nMEDIUM", "EL NIÑO\n\nHARD" };
             Color[] colors = { Color.FromArgb(96, 165, 250), Color.FromArgb(251, 146, 60), Color.FromArgb(202, 138, 4) };
