@@ -1,4 +1,4 @@
-// GameEngine.cs - Member 2 (Grid Mechanics)
+// GameEngine.cs - Member 1 (Back-end: game flow, entities, and rules)
 // Ang "utak" ng laro: player, puso, score, combo, collision at resulta ng cards.
 // Hindi ito nagdo-drawing. Sinasabihan lang nito ang UI gamit ang EVENTS.
 namespace HandaKaNaBa
@@ -10,13 +10,7 @@ namespace HandaKaNaBa
     {
         public int X { get; protected set; }
         public int Y { get; protected set; }
-
-        protected GridEntity(int x, int y)
-        {
-            X = x;
-            Y = y;
-        }
-
+        protected GridEntity(int x, int y) { X = x; Y = y; }
         public abstract string Sprite { get; }
         public bool IsAt(int x, int y) => X == x && Y == y;
     }
@@ -24,28 +18,16 @@ namespace HandaKaNaBa
     public class Player : GridEntity
     {
         public int Invincible { get; set; }   // ticks na hindi tatamaan pagkatapos masaktan
-
         public Player(int x, int y) : base(x, y) { }
-
         public override string Sprite => "player";
-
-        public void MoveTo(int x, int y)
-        {
-            X = x;
-            Y = y;
-        }
+        public void MoveTo(int x, int y) { X = x; Y = y; }
     }
 
     public class FamilyMember : GridEntity
     {
         public FamilyType Type { get; }
         public bool Rescued { get; set; }
-
-        public FamilyMember(FamilyType type, int x, int y) : base(x, y)
-        {
-            Type = type;
-        }
-
+        public FamilyMember(FamilyType type, int x, int y) : base(x, y) { Type = type; }
         public override string Sprite => Type.ToString().ToLower();   // lola, bunso, bantay
         public string Name => Type.ToString();
     }
@@ -80,32 +62,8 @@ namespace HandaKaNaBa
         public Scenario Scenario { get; private set; }
         public string ResultText { get; private set; } = "";
 
-        public bool ExitOpen
-        {
-            get
-            {
-                for (int i = 0; i < Family.Count; i++)
-                {
-                    if (!Family[i].Rescued)
-                        return false;
-                }
-                return true;
-            }
-        }
-
-        public int RescuedCount
-        {
-            get
-            {
-                int count = 0;
-                for (int i = 0; i < Family.Count; i++)
-                {
-                    if (Family[i].Rescued)
-                        count++;
-                }
-                return count;
-            }
-        }
+        public bool ExitOpen => Family.All(f => f.Rescued);
+        public int RescuedCount => Family.Count(f => f.Rescued);
 
         public event Action Changed;            // nagbago ang puso o score
         public event Action EncounterStarted;
@@ -115,86 +73,45 @@ namespace HandaKaNaBa
         {
             Disaster = d;
             Map.Load(d);
-
-            lives = MaxLives;
-            score = 0;
-            combo = 0;
-            Ticks = 0;
-            Hits = 0;
-
+            lives = MaxLives; score = 0; combo = 0; Ticks = 0; Hits = 0;
             Database.MissedLessons.Clear();
             Player = new Player(Map.Start.X, Map.Start.Y);
-
             Family.Clear();
-            foreach (KeyValuePair<FamilyType, Point> spot in Map.FamilySpots)
-            {
+            foreach (var spot in Map.FamilySpots)
                 Family.Add(new FamilyMember(spot.Key, spot.Value.X, spot.Value.Y));
-            }
-
             State = GameState.Walking;
             Changed?.Invoke();
         }
 
         public void MovePlayer(int dx, int dy)
         {
-            if (State != GameState.Walking)
-                return;
+            if (State != GameState.Walking) return;
+            int nx = Player.X + dx, ny = Player.Y + dy;
+            if (!Map.IsWalkable(nx, ny)) return;
 
-            int nx = Player.X + dx;
-            int ny = Player.Y + dy;
-            if (!Map.IsWalkable(nx, ny))
-                return;
-
-            prevX = Player.X;
-            prevY = Player.Y;
+            prevX = Player.X; prevY = Player.Y;
             Player.MoveTo(nx, ny);
-
             CheckHazard();
-            if (State != GameState.Walking)
-                return;
+            if (State != GameState.Walking) return;
 
-            // Tingnan kung may kapamilya sa nilipatang tile
-            FamilyMember foundMember = null;
-            for (int i = 0; i < Family.Count; i++)
-            {
-                if (!Family[i].Rescued && Family[i].IsAt(nx, ny))
-                {
-                    foundMember = Family[i];
-                    break;
-                }
-            }
-
-            if (foundMember != null)
-            {
-                StartEncounter(foundMember);
-            }
-            else if (ExitOpen && Map.Exit.X == nx && Map.Exit.Y == ny)
-            {
-                EndLevel(true);
-            }
+            FamilyMember f = Family.FirstOrDefault(m => !m.Rescued && m.IsAt(nx, ny));
+            if (f != null) StartEncounter(f);
+            else if (ExitOpen && Map.Exit == new Point(nx, ny)) EndLevel(true);
         }
 
         // tinatawag ng MainForm kada 100 ms
         public void Tick()
         {
-            if (State != GameState.Walking)
-                return;
-
+            if (State != GameState.Walking) return;
             Ticks++;
-            if (Player.Invincible > 0)
-            {
-                Player.Invincible--;
-            }
-
+            if (Player.Invincible > 0) Player.Invincible--;
             Map.Tick(Player.X, Player.Y);
             CheckHazard();
         }
 
         private void CheckHazard()
         {
-            if (Player.Invincible > 0 || !Map.IsDanger(Player.X, Player.Y))
-                return;
-
+            if (Player.Invincible > 0 || !Map.IsDanger(Player.X, Player.Y)) return;
             Hits++;
             Player.Invincible = 15;   // 1.5 s na kumikislap
             LoseLife();
@@ -202,14 +119,9 @@ namespace HandaKaNaBa
 
         private void LoseLife()
         {
-            lives--;
-            combo = 0;
+            lives--; combo = 0;
             Changed?.Invoke();
-
-            if (lives <= 0 && State == GameState.Walking)
-            {
-                EndLevel(false);
-            }
+            if (lives <= 0 && State == GameState.Walking) EndLevel(false);
         }
 
         private void StartEncounter(FamilyMember f)
@@ -231,7 +143,6 @@ namespace HandaKaNaBa
                 int points = Scenario.Cards[index].GetPoints(Multiplier, secondsLeft);
                 score += points;
                 ResultText = "+" + points + (combo > 1 ? "   COMBO x" + Multiplier : "");
-
                 if (combo % 3 == 0 && lives < MaxLives)   // Bayanihan Bonus
                 {
                     lives++;
@@ -243,21 +154,9 @@ namespace HandaKaNaBa
             {
                 combo = 0;
                 Database.RecordMiss(Scenario.BestCard.Lesson);
-
-                if (result == CardResult.PwedeNa)
-                {
-                    score += 40;
-                    ResultText = "+40   (combo reset)";
-                    Target.Rescued = true;
-                }
-                else
-                {
-                    lives--;
-                    ResultText = "-1 PUSO   (subukan ulit)";
-                    Player.MoveTo(prevX, prevY);   // balik sa dating tile
-                }
+                if (result == CardResult.PwedeNa) { score += 40; ResultText = "+40   (combo reset)"; Target.Rescued = true; }
+                else { lives--; ResultText = "-1 PUSO   (subukan ulit)"; Player.MoveTo(prevX, prevY); }   // balik sa dating tile
             }
-
             Changed?.Invoke();
             return result;
         }
@@ -266,12 +165,7 @@ namespace HandaKaNaBa
         public void Resume()
         {
             Target = null;
-            if (lives <= 0)
-            {
-                EndLevel(false);
-                return;
-            }
-
+            if (lives <= 0) { EndLevel(false); return; }
             State = GameState.Walking;
             Player.Invincible = 10;
         }
@@ -281,36 +175,20 @@ namespace HandaKaNaBa
             State = cleared ? GameState.Clear : GameState.GameOver;
             Summary.Clear();
             Stars = 0;
-
             if (cleared)
             {
                 int timeBonus = Math.Max(0, 90 - Seconds) * 5;
                 score += 200 + timeBonus;
                 Summary.Add("Nakarating sa EVAC: +200");
                 Summary.Add("Bilis (" + Seconds + "s): +" + timeBonus);
+                if (Hits == 0) { score += 300; Summary.Add("Walang galos: +300"); }
 
-                if (Hits == 0)
-                {
-                    score += 300;
-                    Summary.Add("Walang galos: +300");
-                }
-
-                bool allHanda = Database.MissedLessons.Count == 0;
-                bool noHits = Hits == 0;
-                bool fast = Seconds <= 90;
-
+                bool allHanda = Database.MissedLessons.Count == 0, noHits = Hits == 0, fast = Seconds <= 90;
                 Stars = (allHanda ? 1 : 0) + (noHits ? 1 : 0) + (fast ? 1 : 0);
                 Summary.Add((allHanda ? "★" : "☆") + " Puro HANDA ang pinili");
                 Summary.Add((noHits ? "★" : "☆") + " Walang tama ng sakuna");
                 Summary.Add((fast ? "★" : "☆") + " Natapos sa loob ng 90 segundo");
             }
-            else
-            {
-                // DITO MO ILAGAY ANG MENSAHE KAPAG NATALO KA:
-                Summary.Add("NABIGO KA! Hindi ka naging handa sa sakuna.");
-                Summary.Add("Kulang ang iyong kaalaman sa kaligtasan.");
-            }
-
             Ended?.Invoke();
         }
     }
