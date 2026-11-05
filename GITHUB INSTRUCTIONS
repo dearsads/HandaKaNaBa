@@ -1,0 +1,47 @@
+=========================================================
+ GITHUB INSTRUCTIONS
+=========================================================
+
+GOLDEN RULE: NEVER EDIT SOMEONE ELSE'S FILE. 
+If we stick to our assigned files, we will NEVER get merge conflicts.
+
+FILE ASSIGNMENTS:
+- Member 1 (Lead): EncounterDatabase.cs ONLY, (Logic): GameEngine.cs and DisasterManager.cs ONLY
+- Member 3 AND 4 (UI): UIManager.cs ONLY 
+- Member 4 (Assets): MainForm.cs and the Assets folder ONLY
+
+---------------------------------------------------------
+HOW TO WORK ON THE GAME (Step-by-Step for Visual Studio)
+---------------------------------------------------------
+
+STEP 1: GET THE LATEST CODE (Do this every time you sit down to code)
+1. Open HandaKaNaBa.sln in Visual Studio.
+2. At the top menu, click 'Git' -> 'Pull'. 
+(This downloads everyone else's finished work so you are up to date).
+
+STEP 2: CREATE YOUR SAFE WORKSPACE (Branching)
+1. At the top menu, click 'Git' -> 'New Branch'.
+2. Name it using your role and what you are doing (e.g., "member2-volcano-logic" or "member3-panic-timer").
+3. Click 'Create'. (Check the bottom right of Visual Studio—it should now show your new branch name instead of "main").
+
+STEP 3: WRITE YOUR CODE
+1. Open YOUR assigned .cs file from the Solution Explorer.
+2. Write your code, test it by pressing F5, and make sure it works.
+3. DO NOT open or fix your teammate's file. If their code is breaking yours, message them in the group chat.
+
+STEP 4: SAVE AND UPLOAD (Commit & Push)
+1. Go to 'View' -> 'Git Changes' (or look at the Git Changes tab on the right).
+2. Type a short message about what you did in the text box (e.g., "Added 10-second panic timer").
+3. Click the dropdown arrow next to Commit All and select 'Commit All and Push'.
+
+STEP 5: MERGE YOUR WORK (Pull Request)
+1. Go to our repository on GitHub.com.
+2. You will see a green button that says "Compare & pull request". Click it.
+3. Click "Create pull request".
+4. If it says "This branch has no conflicts with the base branch", click "Merge pull request" -> "Confirm merge".
+5. Your code is now officially in the main game! 
+
+STEP 6: CLEAN UP
+1. Back in Visual Studio, look at the bottom right corner. Click your branch name and switch back to "main".
+2. Click 'Git' -> 'Pull' to download your newly merged code.
+3. You are ready for your next task!
