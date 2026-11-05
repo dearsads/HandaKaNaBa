@@ -10,9 +10,9 @@
     <AssemblyName>HandaKaNaBa</AssemblyName>
   </PropertyGroup>
 
-  <!-- Copy the pixel art to the output folder so AssetLoader can find it -->
+  <!-- Copy every file in Assets (gif, png, ttf) next to the .exe so Sprites can load it -->
   <ItemGroup>
-    <None Update="Assets\**\*.png">
+    <None Update="Assets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -1,65 +1,35 @@
 # Handa Ka Na Ba?
 
-Disaster survival card game for IT111L Concepts in OOP (Laboratory) - Machine Problem.
-C# Windows Forms, .NET 8, Visual Studio 2022.
+IT111L Concepts in OOP machine problem. C# Windows Forms (.NET 8, Visual Studio 2022).
 
-## Running the game
+Walk a 12x12 barangay, dodge the disaster, rescue Lola, Bunso and Bantay through card encounters, then run to the evacuation center.
 
-1. Open `HandaKaNaBa.sln` in Visual Studio 2022 (with the ".NET desktop development" workload).
-2. In Solution Explorer, right-click **HandaKaNaBa** > **Set as Startup Project**.
-3. Press F5.
+## Run
 
-## Running the console test
+Open `HandaKaNaBa.sln` and press F5.
+Controls: WASD or arrow keys to move. During a card, click or press 1, 2, 3. Enter or Space to continue.
 
-1. Right-click **HandaKaNaBa.ConsoleTest** > **Set as Startup Project**.
-2. Press F5. Every line should say `PASS`, and the last line should say `ALL TESTS PASSED`.
-3. It also prints a sample game (5 rounds) in the same format as the Expected Output in the doc.
+## Files
 
-## Team and files
+| File | Member | Contents |
+| --- | --- | --- |
+| `EncounterDatabase.cs` | 1 | `Card` (abstract), `HandaCard`, `PwedeNaCard`, `SablayCard`, `Scenario`, 9 scenarios, 3 maps, report |
+| `GameEngine.cs` | 2 | `GridEntity` (abstract), `Player`, `FamilyMember`, hearts, score, combo, collisions, stars |
+| `DisasterManager.cs` | 2 | `Hazard` (abstract), `Tsunami`, `Lindol`, `ElNino`, the 12x12 map |
+| `UIManager.cs` | 3 | Menu, HUD, encounter panel with the 10-second timer, end screen |
+| `MainForm.cs` | 4 | Program entry, game loop, keyboard, grid drawing, sprite loading |
+| `Assets/` | 4 | 12 sprites (16x16 PNG): floor, grass, wall, high, evac, water, crack, dry, player, lola, bunso, bantay |
 
-### Development Team - Back End & Game Engine (Members 1 & 2)
+## Disasters
 
-| File | What it does |
-|---|---|
-| `Models/Card.cs` | Abstract base class: Name, Emoji, Description (Abstraction) |
-| `Models/DisasterCard.cs` | Disaster type, severity and scenario text (Inheritance) |
-| `Models/ResponseCard.cs` | Base class with `virtual Evaluate()` (Polymorphism) |
-| `Models/SpecificCard.cs` | Perfect for its own disaster, Wrong for the rest |
-| `Models/GeneralCard.cs` | Always Partial |
-| `Models/MemeCard.cs` | Always Wrong, carries a funny line and the lesson |
-| `Data/CardData.cs` | 6 disasters, 30 response cards (24 specific + 6 general), 12 Meme cards |
-| `Engine/Deck.cs` | Shuffle, draw, discard, reshuffle the discard pile when empty |
-| `Engine/Player.cs` | Private lives, score, streak and hand (Encapsulation) |
-| `Engine/GameManager.cs` | Rounds, levels, damage table, scoring, fairness rule, Meme rule, win/lose (Composition) |
-| `Engine/IGameManager.cs` | Integration contract between the engine and the UI |
-| `HandaKaNaBa.ConsoleTest/Program.cs` | Console test of all of the above |
+- **Tsunami (Easy):** a 3-column wave sweeps from the left. Stand on the green hills. Waves get faster after the 3rd.
+- **Lindol (Medium):** cracks in rows and columns flash red, then hurt. They come faster and get longer over time.
+- **El Niño (Hard):** 3x3 patches of grass turn brown, then dry and cracked. Standing on dry ground hurts. More patches at once every 30 seconds, mostly near you.
 
-### Front End & UI Implementation (Members 2 & 1)
+## Scoring
 
-| File | What it does |
-|---|---|
-| `UI/Forms/GameForm.cs` | Gameplay screen: 3 comic panels, hearts, status, scenario, hand, message, Next button |
-| `UI/Controls/CardPanel.cs` | Clickable card drawn with GDI+ (hover effect, disabled state) |
-| `UI/Controls/PixelPanel.cs` | One comic panel; draws pixel art with nearest-neighbor scaling |
-| `UI/Forms/MenuForm.cs` | Play, How to Play, High Score, Exit |
-| `UI/Forms/GameOverForm.cs` | Win/lose, final score, level reached, Play Again / Main Menu |
-| `UI/Forms/HowToPlayForm.cs` | Rules screen |
-| `Services/ScoreManager.cs` | Saves and loads the high score (`highscore.txt` next to the .exe) |
-| `UI/Theme.cs`, `UI/AssetLoader.cs` | Colors, fonts and image loading |
-| `Assets/*.png` | 12 pixel art images (64 x 64). Current ones are placeholders |
-
-## Replacing the pixel art
-
-Keep the same file names and size (64 x 64 PNG) and overwrite the files in `Assets/`:
-
-- Panel 1: `scene_flood.png`, `scene_fire.png`, `scene_typhoon.png`, `scene_earthquake.png`, `scene_landslide.png`, `scene_drought.png`
-- Panel 2: `face_calm.png` (Perfect), `face_panic.png` (before the pick, Partial, Wrong), `face_meme.png` (Meme card)
-- Panel 3: `result_safe.png` (Perfect), `result_hurt.png` (Partial), `result_fail.png` (Wrong or Meme)
-
-If a file is missing, the panel shows a dashed placeholder instead of crashing.
-
-## GitHub rules
-
-- Never code directly on `main`. Use one branch per change, for example `feature/full-implementation`.
-- Open a Pull Request when done. A teammate reviews it before merging.
-- Start each session with `git pull origin main`. Never commit `bin/` or `obj/` (the `.gitignore` already blocks them).
+- HANDA: rescued, +100 x combo (max x3), +10 per second left. Every 3rd HANDA in a row: +1 heart.
+- PWEDE NA: rescued, +40, combo resets.
+- SABLAY or time out: -1 heart, pushed back one tile, try again.
+- Reaching EVAC: +200, +5 per second under 90 s, +300 if never hit.
+- Stars: all HANDA, never hit, finished within 90 s.
