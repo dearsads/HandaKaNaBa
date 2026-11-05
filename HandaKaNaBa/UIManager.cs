@@ -1,23 +1,225 @@
-// UIManager.cs - Member 3 (UI & Timers)
-// Lahat ng screens ay Panel sa iisang window: Menu, HUD, Encounter at End.
-// Binabasa lang ng UI ang engine. Hindi nito binabago ang puso o score.
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+
 namespace HandaKaNaBa
 {
+    public class PixelLabel : Label
+    {
+        public Color FaceColor = Color.Transparent;
+        public int BorderSize = 0;
+        public bool Shadow = false;
+        public bool TextShadow = false;
+
+        public PixelLabel()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.ResizeRedraw, true);
+            BackColor = Color.Transparent;
+        }
+
+        private static StringFormat FormatFor(ContentAlignment a)
+        {
+            var sf = new StringFormat(StringFormatFlags.NoClip);
+
+            switch (a)
+            {
+                case ContentAlignment.TopLeft:
+                case ContentAlignment.TopCenter:
+                case ContentAlignment.TopRight:
+                    sf.LineAlignment = StringAlignment.Near; break;
+                case ContentAlignment.BottomLeft:
+                case ContentAlignment.BottomCenter:
+                case ContentAlignment.BottomRight:
+                    sf.LineAlignment = StringAlignment.Far; break;
+                default:
+                    sf.LineAlignment = StringAlignment.Center; break;
+            }
+
+            switch (a)
+            {
+                case ContentAlignment.TopLeft:
+                case ContentAlignment.MiddleLeft:
+                case ContentAlignment.BottomLeft:
+                    sf.Alignment = StringAlignment.Near; break;
+                case ContentAlignment.TopRight:
+                case ContentAlignment.MiddleRight:
+                case ContentAlignment.BottomRight:
+                    sf.Alignment = StringAlignment.Far; break;
+                default:
+                    sf.Alignment = StringAlignment.Center; break;
+            }
+
+            return sf;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            g.SmoothingMode = SmoothingMode.None;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+
+            int s = Shadow ? 5 : 0;
+            Rectangle face = new Rectangle(0, 0, Width - s, Height - s);
+
+            if (Shadow)
+            {
+                using (var b = new SolidBrush(UIManager.Ink))
+                    g.FillRectangle(b, s, s, face.Width, face.Height);
+            }
+
+            if (FaceColor != Color.Transparent)
+            {
+                using (var b = new SolidBrush(FaceColor))
+                    g.FillRectangle(b, face);
+            }
+
+            if (BorderSize > 0)
+            {
+                using (var b = new SolidBrush(UIManager.Ink))
+                {
+                    g.FillRectangle(b, face.X, face.Y, face.Width, BorderSize);
+                    g.FillRectangle(b, face.X, face.Bottom - BorderSize, face.Width, BorderSize);
+                    g.FillRectangle(b, face.X, face.Y, BorderSize, face.Height);
+                    g.FillRectangle(b, face.Right - BorderSize, face.Y, BorderSize, face.Height);
+                }
+            }
+
+            var textRect = new RectangleF(
+                face.X + BorderSize + Padding.Left,
+                face.Y + BorderSize + Padding.Top,
+                face.Width - BorderSize * 2 - Padding.Horizontal,
+                face.Height - BorderSize * 2 - Padding.Vertical);
+
+            using (var sf = FormatFor(TextAlign))
+            {
+                if (TextShadow)
+                {
+                    var r2 = textRect;
+                    r2.Offset(4, 4);
+                    using (var b = new SolidBrush(UIManager.Ink))
+                        g.DrawString(Text, Font, b, r2, sf);
+                }
+
+                using (var b = new SolidBrush(ForeColor))
+                    g.DrawString(Text, Font, b, textRect, sf);
+            }
+        }
+    }
+
+    public class PixelButton : Button
+    {
+        public Color FaceColor = Color.White;
+        public int BorderThickness = 4;
+
+        private bool hover, pressed;
+        private const int Depth = 6;
+
+        public PixelButton()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.ResizeRedraw, true);
+
+            BackColor = Color.Transparent;
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            TabStop = false;
+            Cursor = Cursors.Hand;
+        }
+
+        protected override bool ShowFocusCues { get { return false; } }
+
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; pressed = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { pressed = true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            g.SmoothingMode = SmoothingMode.None;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+
+            int o = pressed ? Depth - 2 : 0;
+            Rectangle face = new Rectangle(o, o, Width - Depth, Height - Depth);
+
+
+            using (var b = new SolidBrush(UIManager.Ink))
+                g.FillRectangle(b, Depth, Depth, Width - Depth, Height - Depth);
+
+            // face (brighter on hover)
+            Color fill = hover && !pressed
+                ? ControlPaint.Light(FaceColor, 0.35f)
+                : FaceColor;
+
+            using (var b = new SolidBrush(fill))
+                g.FillRectangle(b, face);
+
+            // chunky border
+            int t = BorderThickness;
+            using (var b = new SolidBrush(UIManager.Ink))
+            {
+                g.FillRectangle(b, face.X, face.Y, face.Width, t);
+                g.FillRectangle(b, face.X, face.Bottom - t, face.Width, t);
+                g.FillRectangle(b, face.X, face.Y, t, face.Height);
+                g.FillRectangle(b, face.Right - t, face.Y, t, face.Height);
+            }
+
+            var textRect = new RectangleF(
+                face.X + t + 2, face.Y + t + 2,
+                face.Width - (t + 2) * 2, face.Height - (t + 2) * 2);
+
+            using (var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            })
+            using (var b = new SolidBrush(ForeColor))
+            {
+                g.DrawString(Text, Font, b, textRect, sf);
+            }
+        }
+    }
+
+    // =====================================================================
+    //  UI MANAGER
+    // =====================================================================
+
     public class UIManager
     {
-        // Pop-art na kulay (ginagamit din ng MainForm)
-        public static readonly Color Ink = Color.FromArgb(17, 17, 17), Cream = Color.FromArgb(255, 247, 214),
-            Yellow = Color.FromArgb(253, 224, 71), Cyan = Color.FromArgb(34, 211, 238), Pink = Color.FromArgb(244, 114, 182);
+        // ---- Palette ----
+        public static readonly Color Ink = Color.FromArgb(17, 17, 17);
+        public static readonly Color Blue = ColorTranslator.FromHtml("#2391FF");
+        public static readonly Color Yellow = ColorTranslator.FromHtml("#FFF83F");
+        public static readonly Color Gold = ColorTranslator.FromHtml("#FFCD54");
+        public static readonly Color Red = ColorTranslator.FromHtml("#F70063");
+
         public const int PanicSeconds = 10;
 
         private Form form;
         private GameEngine engine;
+
         private Panel menuPanel, hudPanel, encounterPanel, endPanel;
-        private Label lblHearts, lblStatus, lblTimer, lblWho, lblScenario, lblResult, lblEndTitle, lblStars;
-        private Button[] cardButtons = new Button[3];
-        private Button btnContinue;
+        private PixelLabel lblHearts, lblName, lblSagip, lblScore, lblCombo, lblTime;
+        private PixelLabel lblTimer, lblWho;
+        private PixelLabel lblScenario, lblResult, lblEndTitle, lblStars;
+
+        private PixelButton[] cardButtons = new PixelButton[3];
+        private PixelButton btnContinue;
         private TextBox txtReport;
-        private System.Windows.Forms.Timer panicTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+
+        private System.Windows.Forms.Timer panicTimer =
+            new System.Windows.Forms.Timer { Interval = 1000 };
+
         private int timeLeft;
         private bool picked;
 
@@ -25,57 +227,129 @@ namespace HandaKaNaBa
         {
             this.form = form;
             this.engine = engine;
+
             BuildMenu();
             BuildHud();
             BuildEncounter();
             BuildEnd();
 
-            // nakikinig sa EVENTS ng engine
             engine.Changed += UpdateHud;
             engine.EncounterStarted += ShowEncounter;
             engine.Ended += ShowEnd;
+
             panicTimer.Tick += PanicTick;
+
             ShowOnly(menuPanel);
         }
 
-        // ---------------- helpers para hindi paulit-ulit ----------------
-        private Label MakeLabel(Control parent, string text, int x, int y, int w, int h, Font font, Color back)
+        // ---------------- FONTS ----------------
+
+        private static bool? pixelInstalled;
+
+        private static bool IsPixelInstalled()
         {
-            var lbl = new Label { Text = text, Location = new Point(x, y), Size = new Size(w, h), Font = font,
-                                  BackColor = back, ForeColor = Ink, TextAlign = ContentAlignment.MiddleCenter };
+            if (pixelInstalled == null)
+            {
+                using (var fonts = new InstalledFontCollection())
+                {
+                    pixelInstalled = fonts.Families.Any(f =>
+                        string.Equals(f.Name, "Pixelify Sans",
+                            StringComparison.OrdinalIgnoreCase));
+                }
+            }
+            return pixelInstalled.Value;
+        }
+
+        private static Font Pixel(float size, FontStyle style = FontStyle.Bold)
+        {
+            return new Font(
+                IsPixelInstalled() ? "Pixelify Sans" : "Consolas",
+                size,
+                style);
+        }
+
+        // ---------------- HELPERS ----------------
+
+        private PixelLabel MakeLabel(
+            Control parent,
+            string text,
+            int x, int y, int w, int h,
+            Font font,
+            Color face,
+            int border = 0,
+            bool shadow = false)
+        {
+            var lbl = new PixelLabel
+            {
+                Text = text,
+                Location = new Point(x, y),
+                Size = new Size(w, h),
+                Font = font,
+                FaceColor = face,
+                BorderSize = border,
+                Shadow = shadow,
+                ForeColor = Ink,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
             parent.Controls.Add(lbl);
             return lbl;
         }
 
-        private Button MakeButton(Control parent, string text, int x, int y, int w, int h, Color back, Font font)
+        private PixelButton MakeButton(
+            Control parent,
+            string text,
+            int x, int y, int w, int h,
+            Color face,
+            Font font)
         {
-            var btn = new Button { Text = text, Location = new Point(x, y), Size = new Size(w, h), Font = font, BackColor = back,
-                                   ForeColor = Ink, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, TabStop = false };
-            btn.FlatAppearance.BorderSize = 4;          // makapal na itim na border = comic style
-            btn.FlatAppearance.BorderColor = Ink;
+            var btn = new PixelButton
+            {
+                Text = text,
+                Location = new Point(x, y),
+                Size = new Size(w, h),
+                Font = font,
+                FaceColor = face,
+                ForeColor = Ink
+            };
+
             parent.Controls.Add(btn);
             return btn;
         }
 
-        private Panel MakePanel(Color back, Point location, Size size, DockStyle dock)
+        private Panel MakePanel(
+            Color back,
+            Point location,
+            Size size,
+            DockStyle dock)
         {
-            var p = new Panel { BackColor = back, Location = location, Size = size, Dock = dock, Visible = false };
-            p.Paint += Halftone;
+            var p = new Panel
+            {
+                BackColor = back,
+                Location = location,
+                Size = size,
+                Dock = dock,
+                Visible = false
+            };
+
             form.Controls.Add(p);
             return p;
         }
 
-        private static Font Impact(float size) => new Font("Impact", size);
-        private static Font Segoe(float size, FontStyle style = FontStyle.Bold) => new Font("Segoe UI", size, style);
-
-        // comic-style na tuldok sa background
-        private void Halftone(object sender, PaintEventArgs e)
+        // thick pixel frame around a panel
+        private static void AddFrame(Panel p, int thickness)
         {
-            Control c = (Control)sender;
-            using (var dot = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
-                for (int y = 0; y < c.Height; y += 18)
-                    for (int x = (y / 18) % 2 * 9; x < c.Width; x += 18)
-                        e.Graphics.FillEllipse(dot, x, y, 3, 3);
+            p.Paint += (s, e) =>
+            {
+                using (var b = new SolidBrush(Ink))
+                {
+                    var r = p.ClientRectangle;
+                    e.Graphics.FillRectangle(b, 0, 0, r.Width, thickness);
+                    e.Graphics.FillRectangle(b, 0, r.Height - thickness, r.Width, thickness);
+                    e.Graphics.FillRectangle(b, 0, 0, thickness, r.Height);
+                    e.Graphics.FillRectangle(b, r.Width - thickness, 0, thickness, r.Height);
+                }
+            };
         }
 
         private void ShowOnly(Panel p)
@@ -84,78 +358,259 @@ namespace HandaKaNaBa
             hudPanel.Visible = p == hudPanel;
             endPanel.Visible = p == endPanel;
             encounterPanel.Visible = false;
+
             p.BringToFront();
         }
 
         // ---------------- MENU ----------------
+
         private void BuildMenu()
         {
-            menuPanel = MakePanel(Cyan, Point.Empty, Size.Empty, DockStyle.Fill);
-            MakeLabel(menuPanel, "HANDA KA NA BA?", 64, 50, 480, 90, Impact(44), Color.White).ForeColor = Pink;
-            MakeLabel(menuPanel, "PUMILI NG SAKUNA", 154, 160, 300, 34, Impact(16), Ink).ForeColor = Color.White;
+            menuPanel = MakePanel(
+                Blue,
+                Point.Empty,
+                Size.Empty,
+                DockStyle.Fill);
 
-            string[] names = { "TSUNAMI\n\nEASY", "LINDOL\n\nMEDIUM", "EL NIÑO\n\nHARD" };
-            Color[] colors = { Color.FromArgb(96, 165, 250), Color.FromArgb(251, 146, 60), Color.FromArgb(202, 138, 4) };
+            string backgroundPath = Path.Combine(
+                Application.StartupPath,
+                "Assets",
+                "menu-background.png");
+
+            if (File.Exists(backgroundPath))
+            {
+                using (Image image = Image.FromFile(backgroundPath))
+                {
+                    menuPanel.BackgroundImage = new Bitmap(image);
+                }
+
+                menuPanel.BackgroundImageLayout = ImageLayout.Stretch;
+            }
+
+            string titlePath = Path.Combine(
+                Application.StartupPath,
+                "Assets",
+                "menu title.png");
+
+            if (File.Exists(titlePath))
+            {
+                var titleImage = new PictureBox
+                {
+                    Location = new Point(24, 8),
+                    Size = new Size(600, 240),    
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.Transparent
+                };
+
+                using (Image image = Image.FromFile(titlePath))
+                {
+                    titleImage.Image = new Bitmap(image);
+                }
+
+                menuPanel.Controls.Add(titleImage);
+            }
+
+            var heading = MakeLabel(
+                menuPanel,
+                "PUMILI NG SAKUNA",
+                84, 254, 440, 52,
+                Pixel(22),
+                Red,
+                4,
+                true);
+
+            heading.ForeColor = Color.White;
+
+            string[] names =
+            {
+                "TSUNAMI\n\nEASY",
+                "LINDOL\n\nMEDIUM",
+                "EL NIÑO\n\nHARD"
+            };
+
+            Color[] colors = { Yellow, Gold, Red };
+
             for (int i = 0; i < 3; i++)
             {
                 Difficulty d = (Difficulty)i;
-                MakeButton(menuPanel, names[i], 16 + i * 200, 230, 176, 180, colors[i], Impact(24)).Click += (s, e) => StartGame(d);
+
+                var btn = MakeButton(
+                    menuPanel,
+                    names[i],
+                    16 + i * 200,
+                    320,
+                    182,
+                    170,
+                    colors[i],
+                    Pixel(21));
+
+                if (i == 2)
+                    btn.ForeColor = Color.White;
+
+                btn.Click += (s, e) => StartGame(d);
             }
-            MakeLabel(menuPanel, "WASD / Arrows: gumalaw     1, 2, 3: pumili ng card\nSagipin sina Lola, Bunso at Bantay, tapos tumakbo sa EVAC!",
-                      16, 450, 576, 70, Segoe(11), Color.White);
+
+            MakeLabel(
+                menuPanel,
+                "WASD / Arrows: gumalaw\n" +
+                "1, 2, 3: pumili ng card\n" +
+                "Sagipin sina Lola, Bunso at Bantay, tapos tumakbo sa EVACUATION!",
+                16, 510, 576, 96,
+                Pixel(13),
+                Yellow,
+                4,
+                true);
         }
 
         private void StartGame(Difficulty d)
         {
             engine.StartLevel(d);
+
             ShowOnly(hudPanel);
             UpdateHud();
-            form.ActiveControl = null;   // para sa laro mapunta ang keyboard, hindi sa button
+
+            form.ActiveControl = null;
             form.Focus();
         }
 
         // ---------------- HUD ----------------
+
         private void BuildHud()
         {
-            hudPanel = new Panel { BackColor = Cream, Dock = DockStyle.Top, Height = 64, Visible = false };
+            hudPanel = new Panel
+            {
+                BackColor = Gold,
+                Dock = DockStyle.Top,
+                Height = 64,
+                Visible = false
+            };
+
+            // chunky bottom line
+            hudPanel.Paint += (s, e) =>
+            {
+                using (var b = new SolidBrush(Ink))
+                    e.Graphics.FillRectangle(b, 0, hudPanel.Height - 4, hudPanel.Width, 4);
+            };
+
             form.Controls.Add(hudPanel);
-            lblHearts = MakeLabel(hudPanel, "", 8, 10, 170, 44, new Font("Segoe UI Symbol", 22, FontStyle.Bold), Cream);
-            lblHearts.ForeColor = Pink;
-            lblStatus = MakeLabel(hudPanel, "", 184, 10, 416, 44, Impact(15), Yellow);
+
+            lblHearts = MakeLabel(hudPanel, "", 8, 4, 118, 52,
+                new Font("Segoe UI Symbol", 18, FontStyle.Bold), Ink, 3);
+            lblHearts.ForeColor = Red;
+
+            lblName = MakeHudCell(134, 120);
+            lblSagip = MakeHudCell(260, 80);
+            lblScore = MakeHudCell(346, 100);
+            lblCombo = MakeHudCell(452, 62);
+            lblTime = MakeHudCell(520, 72);
+        }
+
+        private PixelLabel MakeHudCell(int x, int w)
+        {
+            return MakeLabel(hudPanel, "", x, 4, w, 52, Pixel(12), Yellow, 3);
         }
 
         private void UpdateHud()
         {
             int lives = Math.Max(0, engine.Lives);
-            lblHearts.Text = new string('♥', lives) + new string('♡', GameEngine.MaxLives - lives);
-            lblStatus.Text = engine.Map.Current.Name + "    SAGIP " + engine.RescuedCount + "/3    "
-                           + engine.Score + " PTS    x" + engine.Multiplier + "    " + engine.Seconds + "s";
+
+            lblHearts.Text =
+                new string('\u2665', lives) +
+                new string('\u2661', GameEngine.MaxLives - lives);
+
+            lblName.Text = "SAKUNA\n" + engine.Map.Current.Name;
+            lblSagip.Text = "SAGIP\n" + engine.RescuedCount + "/3";
+            lblScore.Text = "SCORE\n" + engine.Score;
+            lblCombo.Text = "COMBO\nx" + engine.Multiplier;
+            lblCombo.Font = new Font("Pixelify Sans", 10, FontStyle.Bold);
+            lblTime.Text = "ORAS\n" + engine.Seconds + "s";
         }
 
         public void Tick()
         {
-            if (hudPanel.Visible) UpdateHud();
+            if (hudPanel.Visible)
+                UpdateHud();
         }
 
         // ---------------- ENCOUNTER + PANIC TIMER ----------------
+
         private void BuildEncounter()
         {
-            encounterPanel = MakePanel(Yellow, new Point(24, 80), new Size(560, 560), DockStyle.None);
-            lblTimer = MakeLabel(encounterPanel, "10", 16, 12, 100, 90, Impact(54), Color.Transparent);
-            lblWho = MakeLabel(encounterPanel, "", 124, 28, 420, 56, Impact(26), Color.White);
-            lblScenario = MakeLabel(encounterPanel, "", 16, 112, 528, 104, Segoe(11), Ink);
+            encounterPanel = MakePanel(
+                Gold,
+                new Point(24, 80),
+                new Size(560, 560),
+                DockStyle.None);
+
+            AddFrame(encounterPanel, 6);
+
+            lblTimer = MakeLabel(
+                encounterPanel,
+                "10",
+                20, 16, 104, 80,
+                Pixel(50),
+                Yellow,
+                4,
+                true);
+
+            lblWho = MakeLabel(
+                encounterPanel,
+                "",
+                136, 16, 404, 80,
+                Pixel(24),
+                Blue,
+                4,
+                true);
+
+            lblWho.ForeColor = Color.White;
+            lblWho.TextShadow = true;
+
+            lblScenario = MakeLabel(
+                encounterPanel,
+                "",
+                20, 104, 520, 116,
+                Pixel(15),
+                Ink,
+                4);
+
             lblScenario.ForeColor = Color.White;
-            lblScenario.Padding = new Padding(10);
+            lblScenario.Padding = new Padding(8);
 
             for (int i = 0; i < 3; i++)
             {
                 int index = i;
-                cardButtons[i] = MakeButton(encounterPanel, "", 16 + i * 182, 228, 164, 196, Color.White, Segoe(10));
+
+                cardButtons[i] = MakeButton(
+                    encounterPanel,
+                    "",
+                    20 + i * 180,
+                    230,
+                    168,
+                    186,
+                    Color.White,
+                    Pixel(12));
+
                 cardButtons[i].Click += (s, e) => Choose(index);
             }
-            lblResult = MakeLabel(encounterPanel, "", 16, 436, 400, 110, Segoe(9.5f, FontStyle.Regular), Color.White);
+
+            lblResult = MakeLabel(
+                encounterPanel,
+                "",
+                20, 426, 396, 120,
+                Pixel(12),
+                Color.White,
+                4);
+
             lblResult.TextAlign = ContentAlignment.TopLeft;
-            btnContinue = MakeButton(encounterPanel, "TULOY ▶", 426, 452, 118, 76, Ink, Impact(18));
+            lblResult.Padding = new Padding(6);
+
+            btnContinue = MakeButton(
+                encounterPanel,
+                "TULOY ▶",
+                426, 436, 114, 100,
+                Ink,
+                Pixel(17));
+
             btnContinue.ForeColor = Yellow;
             btnContinue.Click += (s, e) => Continue();
         }
@@ -164,20 +619,36 @@ namespace HandaKaNaBa
         {
             picked = false;
             timeLeft = PanicSeconds;
+
             lblTimer.Text = timeLeft.ToString();
             lblTimer.ForeColor = Ink;
-            lblWho.Text = "SAGIPIN SI " + engine.Target.Name.ToUpper() + "!";
+            lblTimer.FaceColor = Yellow;
+            lblTimer.Invalidate();
+
+            lblWho.Text =
+                "SAGIPIN SI " + engine.Target.Name.ToUpper() + "!";
+
             lblScenario.Text = engine.Scenario.Text;
+
             for (int i = 0; i < 3; i++)
             {
                 Card c = engine.Scenario.Cards[i];
-                cardButtons[i].Text = "[" + (i + 1) + "]\n\n" + c.Title + "\n\n" + c.Hint;
-                cardButtons[i].BackColor = Color.White;
-                cardButtons[i].FlatAppearance.BorderSize = 4;
+
+                cardButtons[i].Text =
+                    "[" + (i + 1) + "]\n" +
+                    c.Title + "\n\n" + c.Hint;
+
+                cardButtons[i].FaceColor = Color.White;
+                cardButtons[i].BorderThickness = 4;
+                cardButtons[i].Invalidate();
             }
-            lblResult.Visible = btnContinue.Visible = false;
+
+            lblResult.Visible = false;
+            btnContinue.Visible = false;
+
             encounterPanel.Visible = true;
             encounterPanel.BringToFront();
+
             form.ActiveControl = null;
             panicTimer.Start();
         }
@@ -185,73 +656,177 @@ namespace HandaKaNaBa
         private void PanicTick(object sender, EventArgs e)
         {
             timeLeft--;
-            lblTimer.Text = timeLeft.ToString();
-            if (timeLeft <= 3) lblTimer.ForeColor = Color.Red;
-            if (timeLeft <= 0) Choose(-1);
+
+            lblTimer.Text = Math.Max(0, timeLeft).ToString();
+
+            if (timeLeft <= 3)
+            {
+                lblTimer.FaceColor = Red;         
+                lblTimer.ForeColor = Color.White;
+                lblTimer.Invalidate();
+            }
+
+            if (timeLeft <= 0)
+                Choose(-1);
         }
 
         private void Choose(int index)
         {
-            if (picked) return;
+            if (picked)
+                return;
+
             picked = true;
             panicTimer.Stop();
+
             engine.ChooseCard(index, Math.Max(0, timeLeft));
 
-            // i-flip lahat ng 3 card para makita kung bakit tama o mali
             for (int i = 0; i < 3; i++)
             {
                 Card c = engine.Scenario.Cards[i];
+
                 cardButtons[i].Text = c.Label + "\n\n" + c.Title;
-                cardButtons[i].BackColor = c.Color;
-                cardButtons[i].FlatAppearance.BorderSize = i == index ? 8 : 2;
+                cardButtons[i].FaceColor = c.Color;
+                cardButtons[i].BorderThickness = i == index ? 8 : 3;
+                cardButtons[i].Invalidate();
             }
-            string reaction = index >= 0 ? engine.Scenario.Cards[index].Reaction : "Na-freeze ka! Naubos ang oras.";
-            lblResult.Text = reaction + "\n\nAral: " + engine.Scenario.BestCard.Lesson + "\n" + engine.ResultText;
-            lblResult.Visible = btnContinue.Visible = true;
+
+            string reaction = index >= 0
+                ? engine.Scenario.Cards[index].Reaction
+                : "Na-freeze ka! Naubos ang oras.";
+
+            lblResult.Text =
+                reaction + "\n\nAral: " +
+                engine.Scenario.BestCard.Lesson + "\n" +
+                engine.ResultText;
+
+            lblResult.Visible = true;
+            btnContinue.Visible = true;
         }
 
         private void Continue()
         {
-            if (!picked) return;
+            if (!picked)
+                return;
+
             encounterPanel.Visible = false;
             engine.Resume();
+
             form.ActiveControl = null;
             form.Focus();
         }
 
-        // keyboard habang may card: 1/2/3 pumili, Enter/Space tuloy
         public bool HandleKey(Keys key)
         {
-            if (!encounterPanel.Visible) return false;
-            if (!picked && key >= Keys.D1 && key <= Keys.D3) { Choose(key - Keys.D1); return true; }
-            if (picked && (key == Keys.Enter || key == Keys.Space)) { Continue(); return true; }
+            if (!encounterPanel.Visible)
+                return false;
+
+            if (!picked && key >= Keys.D1 && key <= Keys.D3)
+            {
+                Choose((int)key - (int)Keys.D1);
+                return true;
+            }
+
+            if (picked && (key == Keys.Enter || key == Keys.Space))
+            {
+                Continue();
+                return true;
+            }
+
             return false;
         }
 
         // ---------------- END SCREEN + REPORT ----------------
+
         private void BuildEnd()
         {
-            endPanel = MakePanel(Yellow, Point.Empty, Size.Empty, DockStyle.Fill);
-            lblEndTitle = MakeLabel(endPanel, "", 16, 20, 576, 76, Impact(44), Color.Transparent);
-            lblStars = MakeLabel(endPanel, "", 16, 96, 576, 56, new Font("Segoe UI Symbol", 32, FontStyle.Bold), Color.Transparent);
-            txtReport = new TextBox { Location = new Point(40, 160), Size = new Size(528, 400), Multiline = true, ReadOnly = true,
-                                      ScrollBars = ScrollBars.Vertical, Font = Segoe(10.5f, FontStyle.Regular), TabStop = false };
+            endPanel = MakePanel(
+                Gold,
+                Point.Empty,
+                Size.Empty,
+                DockStyle.Fill);
+
+            lblEndTitle = MakeLabel(
+                endPanel,
+                "",
+                16, 12, 576, 84,
+                Pixel(36),
+                Color.Transparent);
+
+            lblEndTitle.TextShadow = true;
+            lblEndTitle.ForeColor = Color.White;
+
+            lblStars = MakeLabel(
+                endPanel,
+                "",
+                16, 98, 576, 56,
+                new Font("Segoe UI Symbol", 32, FontStyle.Bold),
+                Color.Transparent);
+
+            txtReport = new TextBox
+            {
+                Location = new Point(40, 160),
+                Size = new Size(528, 400),
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                Font = Pixel(13, FontStyle.Regular),
+                BackColor = Color.White,
+                ForeColor = Ink,
+                BorderStyle = BorderStyle.FixedSingle,
+                TabStop = false
+            };
+
             endPanel.Controls.Add(txtReport);
-            MakeButton(endPanel, "ULITIN", 40, 576, 250, 64, Cyan, Impact(24)).Click += (s, e) => StartGame(engine.Disaster);
-            MakeButton(endPanel, "MENU", 318, 576, 250, 64, Color.White, Impact(24)).Click += (s, e) => ShowOnly(menuPanel);
+
+            MakeButton(
+                endPanel,
+                "ULITIN",
+                40, 576, 250, 64,
+                Yellow,
+                Pixel(26)).Click += (s, e) => StartGame(engine.Disaster);
+
+            MakeButton(
+                endPanel,
+                "MENU",
+                318, 576, 250, 64,
+                Color.White,
+                Pixel(26)).Click += (s, e) => ShowOnly(menuPanel);
         }
 
         private void ShowEnd()
         {
             panicTimer.Stop();
-            bool won = engine.State == GameState.Clear;
-            endPanel.BackColor = won ? Yellow : Pink;
-            lblEndTitle.Text = won ? "NAKALIGTAS!" : "SABLAY! UBOS ANG PUSO";
-            lblStars.Text = won ? new string('★', engine.Stars) + new string('☆', 3 - engine.Stars) : "";
 
-            var lines = new List<string>(engine.Summary) { "", "=== BARANGAY ASSEMBLY REPORT ===" };
-            lines.Add(engine.Database.GetReport(engine.Disaster, engine.Stars));
-            txtReport.Text = string.Join(Environment.NewLine, lines);
+            bool won = engine.State == GameState.Clear;
+
+            endPanel.BackColor = won ? Gold : Red;
+
+            lblEndTitle.Text = won
+                ? "NAKALIGTAS!"
+                : "SABLAY! UBOS ANG PUSO";
+
+            lblStars.ForeColor = won ? Ink : Color.White;
+
+            lblStars.Text = won
+                ? new string('★', engine.Stars) +
+                  new string('☆', 3 - engine.Stars)
+                : "";
+
+            var lines = new List<string>(engine.Summary)
+            {
+                "",
+                "=== BARANGAY ASSEMBLY REPORT ==="
+            };
+
+            lines.Add(
+                engine.Database.GetReport(
+                    engine.Disaster,
+                    engine.Stars));
+
+            txtReport.Text = string.Join(
+                Environment.NewLine,
+                lines);
+
             ShowOnly(endPanel);
         }
     }
