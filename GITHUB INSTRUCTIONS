@@ -20,8 +20,14 @@ STEP 1: GET THE LATEST CODE (Do this every time you sit down to code)
 (This downloads everyone else's finished work so you are up to date).
 
 STEP 2: CREATE YOUR SAFE WORKSPACE (Branching)
+Before editing:
+
+Confirm the branch name is not main.
+If it says main, go to Git → New Branch, name your branch, and click Create.
+Check the bottom-right corner again to make sure your new branch is selected.
+You can also see the current branch under Git → Manage Branches.
 1. At the top menu, click 'Git' -> 'New Branch'.
-2. Name it using your role and what you are doing (e.g., "member2-volcano-logic" or "member3-panic-timer").
+2. Name it using your role and what you are doing (e.g., "member2-elnino-logic" or "member3-panic-timer").
 3. Click 'Create'. (Check the bottom right of Visual Studio—it should now show your new branch name instead of "main").
 
 STEP 3: WRITE YOUR CODE
