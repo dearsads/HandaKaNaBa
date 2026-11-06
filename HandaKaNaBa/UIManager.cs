@@ -1,3 +1,5 @@
+//changing something so i can remove clutter from the main branch
+
 // UIManager.cs - Member 3 (Front-end: screens, HUD, encounter UI, timers, and animation)
 // The UI only PRESENTS the GameEngine state. Gameplay rules stay inside GameEngine.
 //
