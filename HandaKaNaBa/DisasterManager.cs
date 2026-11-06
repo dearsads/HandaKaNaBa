@@ -2,13 +2,13 @@
 // Ang 12x12 na mapa at ang 3 sakuna. 1 tick = 100 ms, kaya 10 ticks = 1 segundo.
 namespace HandaKaNaBa
 {
-    public enum Tile { Floor, Wall, High, Evac }
+    public enum Tile { Floor, Wall, High, Evac } // Enum: each map cell has one named kind of terrain.
 
     // ABSTRACT parent class: bawat sakuna may sariling Update, IsWarning at IsDanger
-    public abstract class Hazard
+    public abstract class Hazard // Abstraction: all disasters answer the same warning/danger questions.
     {
         protected DisasterManager map;
-        protected Random rng = new Random();
+        protected Random rng = new Random(); // protected means each disaster child can use this random-number generator.
         protected int age;   // ilang ticks na ang lumipas
 
         protected Hazard(DisasterManager map)
@@ -18,13 +18,13 @@ namespace HandaKaNaBa
 
         public abstract string Name { get; }
         public abstract string DangerSprite { get; }
-        public abstract void Update(int playerX, int playerY);
-        public abstract bool IsWarning(int x, int y);   // kumikislap: umalis ka na!
-        public abstract bool IsDanger(int x, int y);    // -1 puso
+        public abstract void Update(int playerX, int playerY); // Each disaster must define how it changes over time.
+        public abstract bool IsWarning(int x, int y);   // Abstract method: each disaster decides which tiles warn the player.
+        public abstract bool IsDanger(int x, int y);    // Abstract method: each disaster decides which tiles cause damage.
     }
 
     // TSUNAMI: alon na 3 column ang kapal, galing sa kaliwa. Ligtas sa ^ (burol).
-    public class Tsunami : Hazard
+    public class Tsunami : Hazard // Inheritance: tsunami follows the shared Hazard interface and rules.
     {
         private int front = -20;   // column ng alon; negative = pahinga pa
         private int waves = 0;
@@ -72,7 +72,7 @@ namespace HandaKaNaBa
     }
 
     // LINDOL: bitak sa row o column. Habang tumatagal, mas madalas at mas mahaba.
-    public class Lindol : Hazard
+    public class Lindol : Hazard // Each child overrides the hazard behavior in its own way.
     {
         private class Crack
         {
@@ -226,16 +226,16 @@ namespace HandaKaNaBa
     public class DisasterManager
     {
         private const int GridSize = 12;
-        private readonly Tile[,] tiles = new Tile[GridSize, GridSize];   // tiles[x, y]
+        private readonly Tile[,] tiles = new Tile[GridSize, GridSize];   // 2D array: one tile value for each x/y map coordinate.
 
-        public Hazard Current { get; private set; }
+        public Hazard Current { get; private set; } // Polymorphism: this one variable can refer to any selected Hazard child.
         public Point Start { get; private set; }
         public Point Exit { get; private set; }
-        public Dictionary<FamilyType, Point> FamilySpots { get; } = new Dictionary<FamilyType, Point>();
+        public Dictionary<FamilyType, Point> FamilySpots { get; } = new Dictionary<FamilyType, Point>(); // Dictionary pairs a family-type key with its map-position value.
 
         public void Load(Difficulty d)
         {
-            string[] rows = EncounterDatabase.GetMap(d);
+            string[] rows = EncounterDatabase.GetMap(d); // Array: each string is one row of the map description.
             FamilySpots.Clear();
 
             for (int y = 0; y < GridSize; y++)
@@ -279,7 +279,7 @@ namespace HandaKaNaBa
                 }
             }
 
-            if (d == Difficulty.Tsunami)
+            if (d == Difficulty.Tsunami) // Create the matching Hazard child; later calls work through Current.
                 Current = new Tsunami(this);
             else if (d == Difficulty.Lindol)
                 Current = new Lindol(this);
@@ -297,7 +297,7 @@ namespace HandaKaNaBa
         }
 
         public bool IsWalkable(int x, int y) => GetTile(x, y) != Tile.Wall;
-        public void Tick(int px, int py) => Current.Update(px, py);
+        public void Tick(int px, int py) => Current.Update(px, py); // Expression-bodied method: short syntax for one statement.
 
         // laging ligtas ang evacuation center
         public bool IsDanger(int x, int y) => GetTile(x, y) != Tile.Evac && Current.IsDanger(x, y);

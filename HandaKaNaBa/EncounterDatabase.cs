@@ -4,12 +4,12 @@ using System.Text;
 
 namespace HandaKaNaBa
 {
-    public enum Difficulty { Tsunami, Lindol, ElNino }
-    public enum FamilyType { Lola, Bunso, Bantay }
-    public enum CardResult { Handa, PwedeNa, Sablay }
+    public enum Difficulty { Tsunami, Lindol, ElNino } // Enum: only these three disaster choices are allowed.
+    public enum FamilyType { Lola, Bunso, Bantay } // Enum: the family member can only be one of these named types.
+    public enum CardResult { Handa, PwedeNa, Sablay } // Enum: a card answer has one of these three results.
 
     // ABSTRACT parent class ng lahat ng cards (Abstraction & Inheritance)
-    public abstract class Card
+    public abstract class Card // Abstract class: shared card data plus rules every answer type must provide.
     {
         public string Title { get; }
         public string Hint { get; }
@@ -29,10 +29,10 @@ namespace HandaKaNaBa
         public abstract Color Color { get; }
 
         // POLYMORPHISM: bawat klase ng card ay may sariling computation ng points
-        public abstract int GetPoints(int combo, int secondsLeft);
+        public abstract int GetPoints(int combo, int secondsLeft); // Each child card calculates its score differently.
     }
 
-    public class HandaCard : Card
+    public class HandaCard : Card // Inheritance: this card reuses Card's text fields and constructor.
     {
         public HandaCard(string t, string h, string r, string l) : base(t, h, r, l) { }
 
@@ -40,13 +40,13 @@ namespace HandaKaNaBa
         public override string Label => "HANDA!";
         public override Color Color => Color.FromArgb(52, 211, 153);
 
-        public override int GetPoints(int combo, int secondsLeft)
+        public override int GetPoints(int combo, int secondsLeft) // Polymorphism: HANDA supplies its own scoring behavior.
         {
             return (100 * combo) + (10 * secondsLeft);
         }
     }
 
-    public class PwedeNaCard : Card
+    public class PwedeNaCard : Card // This card is also a Card, but uses its own points rule.
     {
         public PwedeNaCard(string t, string h, string r, string l) : base(t, h, r, l) { }
 
@@ -60,7 +60,7 @@ namespace HandaKaNaBa
         }
     }
 
-    public class SablayCard : Card
+    public class SablayCard : Card // A third Card type with its own result and score.
     {
         public SablayCard(string t, string h, string r, string l) : base(t, h, r, l) { }
 
@@ -79,9 +79,9 @@ namespace HandaKaNaBa
         public Difficulty Disaster { get; }
         public FamilyType Who { get; }
         public string Text { get; }
-        public Card[] Cards { get; }
+        public Card[] Cards { get; } // Array: a fixed-size group of cards belonging to this scenario.
 
-        public Scenario(Difficulty disaster, FamilyType who, string text, params Card[] cards)
+        public Scenario(Difficulty disaster, FamilyType who, string text, params Card[] cards) // params lets callers pass cards one by one.
         {
             Disaster = disaster;
             Who = who;
@@ -106,10 +106,10 @@ namespace HandaKaNaBa
 
     public class EncounterDatabase
     {
-        private readonly List<Scenario> scenarios = new List<Scenario>();
-        private readonly Random rng = new Random();
+        private readonly List<Scenario> scenarios = new List<Scenario>(); // List stores all scenarios; readonly prevents replacing the list itself.
+        private readonly Random rng = new Random(); // Random makes the order of the answer cards unpredictable.
 
-        public List<string> MissedLessons { get; } = new List<string>();
+        public List<string> MissedLessons { get; } = new List<string>(); // Remember unique lessons the player missed.
 
         public EncounterDatabase()
         {
@@ -196,7 +196,7 @@ namespace HandaKaNaBa
                 shuffled[i] = found.Cards[i];
             }
 
-            for (int i = shuffled.Length - 1; i > 0; i--)
+            for (int i = shuffled.Length - 1; i > 0; i--) // Fisher-Yates: swap each card with a randomly chosen earlier card.
             {
                 int j = rng.Next(i + 1);
                 Card temp = shuffled[i];

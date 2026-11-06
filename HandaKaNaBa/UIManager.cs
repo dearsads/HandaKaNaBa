@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 namespace HandaKaNaBa
 {
-    public class PixelLabel : Label
+    public class PixelLabel : Label // Inherits a normal label, then customizes how it looks.
     {
         public Color FaceColor = Color.Transparent;
         public int BorderSize = 0;
@@ -59,7 +59,7 @@ namespace HandaKaNaBa
             return sf;
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnPaint(PaintEventArgs e) // Polymorphism: Windows Forms uses our drawing instead of the default label drawing.
         {
             Graphics g = e.Graphics;
             g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
@@ -114,7 +114,7 @@ namespace HandaKaNaBa
         }
     }
 
-    public class PixelButton : Button
+    public class PixelButton : Button // Inherits click behavior from Button and adds a pixel-art appearance.
     {
         public Color FaceColor = Color.White;
         public int BorderThickness = 4;
@@ -142,7 +142,7 @@ namespace HandaKaNaBa
         protected override void OnMouseDown(MouseEventArgs e) { pressed = true; Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnPaint(PaintEventArgs e) // Override draws this button's custom appearance.
         {
             Graphics g = e.Graphics;
             g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
@@ -194,7 +194,7 @@ namespace HandaKaNaBa
     //  UI MANAGER
     // =====================================================================
 
-    public class UIManager
+    public class UIManager // Keeps screen controls separate from the engine's gameplay rules.
     {
         // ---- Palette ----
         public static readonly Color Ink = Color.FromArgb(17, 17, 17);
@@ -203,10 +203,10 @@ namespace HandaKaNaBa
         public static readonly Color Gold = ColorTranslator.FromHtml("#FFCD54");
         public static readonly Color Red = ColorTranslator.FromHtml("#F70063");
 
-        public const int PanicSeconds = 10;
+        public const int PanicSeconds = 15; // Players have 15 seconds to choose an answer.
 
         private Form form;
-        private GameEngine engine;
+        private GameEngine engine; // Reference to the same engine object that MainForm uses.
 
         private Panel menuPanel, hudPanel, encounterPanel, endPanel;
         private PixelLabel lblHearts, lblName, lblSagip, lblScore, lblCombo, lblTime;
@@ -217,7 +217,7 @@ namespace HandaKaNaBa
         private PixelButton btnContinue;
         private TextBox txtReport;
 
-        private System.Windows.Forms.Timer panicTimer =
+        private System.Windows.Forms.Timer panicTimer = // This timer raises Tick once a second to count down card time.
             new System.Windows.Forms.Timer { Interval = 1000 };
 
         private int timeLeft;
@@ -233,7 +233,7 @@ namespace HandaKaNaBa
             BuildEncounter();
             BuildEnd();
 
-            engine.Changed += UpdateHud;
+            engine.Changed += UpdateHud; // Subscribe to engine notifications so the display stays in sync.
             engine.EncounterStarted += ShowEncounter;
             engine.Ended += ShowEnd;
 
@@ -252,7 +252,7 @@ namespace HandaKaNaBa
             {
                 using (var fonts = new InstalledFontCollection())
                 {
-                    pixelInstalled = fonts.Families.Any(f =>
+                    pixelInstalled = fonts.Families.Any(f => // LINQ Any checks whether at least one font matches.
                         string.Equals(f.Name, "Pixelify Sans",
                             StringComparison.OrdinalIgnoreCase));
                 }
@@ -447,7 +447,7 @@ namespace HandaKaNaBa
                 if (i == 2)
                     btn.ForeColor = Color.White;
 
-                btn.Click += (s, e) => StartGame(d);
+                btn.Click += (s, e) => StartGame(d); // Lambda: a small action to run when this button is clicked.
             }
 
             MakeLabel(
@@ -546,9 +546,9 @@ namespace HandaKaNaBa
 
             lblTimer = MakeLabel(
                 encounterPanel,
-                "10",
+                PanicSeconds + "s",
                 20, 16, 104, 80,
-                Pixel(50),
+                Pixel(36),
                 Yellow,
                 4,
                 true);
@@ -590,7 +590,7 @@ namespace HandaKaNaBa
                     Color.White,
                     Pixel(12));
 
-                cardButtons[i].Click += (s, e) => Choose(index);
+                cardButtons[i].Click += (s, e) => Choose(index); // Lambda remembers this card's index for its click action.
             }
 
             lblResult = MakeLabel(
@@ -620,7 +620,7 @@ namespace HandaKaNaBa
             picked = false;
             timeLeft = PanicSeconds;
 
-            lblTimer.Text = timeLeft.ToString();
+            lblTimer.Text = timeLeft + "s";
             lblTimer.ForeColor = Ink;
             lblTimer.FaceColor = Yellow;
             lblTimer.Invalidate();
@@ -657,7 +657,7 @@ namespace HandaKaNaBa
         {
             timeLeft--;
 
-            lblTimer.Text = Math.Max(0, timeLeft).ToString();
+            lblTimer.Text = Math.Max(0, timeLeft) + "s";
 
             if (timeLeft <= 3)
             {

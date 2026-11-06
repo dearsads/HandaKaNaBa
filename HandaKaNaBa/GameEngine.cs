@@ -3,31 +3,31 @@
 // Hindi ito nagdo-drawing. Sinasabihan lang nito ang UI gamit ang EVENTS.
 namespace HandaKaNaBa
 {
-    public enum GameState { Menu, Walking, Encounter, Clear, GameOver }
+    public enum GameState { Menu, Walking, Encounter, Clear, GameOver } // Enum: fixed named choices for the game's current state.
 
     // ABSTRACT parent ng lahat ng nasa grid
-    public abstract class GridEntity
+    public abstract class GridEntity // Abstraction: shared idea for anything with a position on the map.
     {
-        public int X { get; protected set; }
+        public int X { get; protected set; } // A protected setter lets this class and child classes change the position.
         public int Y { get; protected set; }
 
-        protected GridEntity(int x, int y)
+        protected GridEntity(int x, int y) // Constructor: runs when a new grid entity is created.
         {
             X = x;
             Y = y;
         }
 
-        public abstract string Sprite { get; }
+        public abstract string Sprite { get; } // Child classes must provide their own sprite name.
         public bool IsAt(int x, int y) => X == x && Y == y;
     }
 
-    public class Player : GridEntity
+    public class Player : GridEntity // Inheritance: Player reuses position and behavior from GridEntity.
     {
         public int Invincible { get; set; }   // ticks na hindi tatamaan pagkatapos masaktan
 
-        public Player(int x, int y) : base(x, y) { }
+        public Player(int x, int y) : base(x, y) { } // base(...) calls the parent constructor to set the starting position.
 
-        public override string Sprite => "player";
+        public override string Sprite => "player"; // override supplies this child's version of the parent's abstract property.
 
         public void MoveTo(int x, int y)
         {
@@ -36,7 +36,7 @@ namespace HandaKaNaBa
         }
     }
 
-    public class FamilyMember : GridEntity
+    public class FamilyMember : GridEntity // Another child class; it shares the same position rules as Player.
     {
         public FamilyType Type { get; }
         public bool Rescued { get; set; }
@@ -46,7 +46,7 @@ namespace HandaKaNaBa
             Type = type;
         }
 
-        public override string Sprite => Type.ToString().ToLower();   // lola, bunso, bantay
+        public override string Sprite => Type.ToString().ToLower();   // override: choose the sprite name from this member's type.
         public string Name => Type.ToString();
     }
 
@@ -60,7 +60,7 @@ namespace HandaKaNaBa
         private int combo;
         private int prevX, prevY;   // huling tile bago gumalaw (pang push-back)
 
-        public GameState State { get; private set; } = GameState.Menu;
+        public GameState State { get; private set; } = GameState.Menu; // Other classes can read State, but only GameEngine can change it.
         public Difficulty Disaster { get; private set; }
         public int Lives => lives;
         public int Score => score;
@@ -69,13 +69,13 @@ namespace HandaKaNaBa
         public int Seconds => Ticks / 10;
         public int Hits { get; private set; }
         public int Stars { get; private set; }
-        public List<string> Summary { get; } = new List<string>();
+        public List<string> Summary { get; } = new List<string>(); // List: a resizable collection for the end-of-game messages.
 
-        // COMPOSITION: ang engine ang may-ari ng mapa, database, player at pamilya
+        // COMPOSITION: the engine is built from helper objects that each handle part of the game.
         public DisasterManager Map { get; } = new DisasterManager();
         public EncounterDatabase Database { get; } = new EncounterDatabase();
         public Player Player { get; private set; }
-        public List<FamilyMember> Family { get; } = new List<FamilyMember>();
+        public List<FamilyMember> Family { get; } = new List<FamilyMember>(); // A list lets us loop through each family member.
         public FamilyMember Target { get; private set; }
         public Scenario Scenario { get; private set; }
         public string ResultText { get; private set; } = "";
@@ -107,7 +107,7 @@ namespace HandaKaNaBa
             }
         }
 
-        public event Action Changed;            // nagbago ang puso o score
+        public event Action Changed;            // Event: a notification with no extra data when the game changes.
         public event Action EncounterStarted;
         public event Action Ended;
 
@@ -126,13 +126,13 @@ namespace HandaKaNaBa
             Player = new Player(Map.Start.X, Map.Start.Y);
 
             Family.Clear();
-            foreach (KeyValuePair<FamilyType, Point> spot in Map.FamilySpots)
+            foreach (KeyValuePair<FamilyType, Point> spot in Map.FamilySpots) // foreach visits each family-type/map-position pair.
             {
                 Family.Add(new FamilyMember(spot.Key, spot.Value.X, spot.Value.Y));
             }
 
             State = GameState.Walking;
-            Changed?.Invoke();
+            Changed?.Invoke(); // ?. calls the event only if a listener has subscribed.
         }
 
         public void MovePlayer(int dx, int dy)
@@ -217,7 +217,7 @@ namespace HandaKaNaBa
             Target = f;
             Scenario = Database.Draw(Disaster, f.Type);
             State = GameState.Encounter;
-            EncounterStarted?.Invoke();
+            EncounterStarted?.Invoke(); // Notify the UI so it can show the rescue cards.
         }
 
         // tinatawag ng UI: index 0-2 = card na pinili, -1 = naubos ang oras
@@ -225,41 +225,58 @@ namespace HandaKaNaBa
         {
             CardResult result = Database.CheckAnswer(Scenario, index);
 
-            if (result == CardResult.Handa)
-            {
-                combo++;
-                int points = Scenario.Cards[index].GetPoints(Multiplier, secondsLeft);
-                score += points;
-                ResultText = "+" + points + (combo > 1 ? "   COMBO x" + Multiplier : "");
-
-                if (combo % 3 == 0 && lives < MaxLives)   // Bayanihan Bonus
-                {
-                    lives++;
-                    ResultText += "   BAYANIHAN BONUS +1 PUSO";
-                }
-                Target.Rescued = true;
-            }
-            else   // PWEDE NA o SABLAY: reset ang combo at itatala ang aral
+            if (result != CardResult.Handa)
             {
                 combo = 0;
                 Database.RecordMiss(Scenario.BestCard.Lesson);
+            }
 
-                if (result == CardResult.PwedeNa)
-                {
-                    score += 40;
-                    ResultText = "+40   (combo reset)";
-                    Target.Rescued = true;
-                }
-                else
-                {
-                    lives--;
-                    ResultText = "-1 PUSO   (subukan ulit)";
-                    Player.MoveTo(prevX, prevY);   // balik sa dating tile
-                }
+            switch (result) // Choose the matching game rule for the answer result.
+            {
+                case CardResult.Handa:
+                    ApplyHandaResult(index, secondsLeft);
+                    break;
+                case CardResult.PwedeNa:
+                    ApplyPwedeNaResult();
+                    break;
+                case CardResult.Sablay:
+                default:
+                    ApplySablayResult();
+                    break;
             }
 
             Changed?.Invoke();
             return result;
+        }
+
+        private void ApplyHandaResult(int cardIndex, int secondsLeft)
+        {
+            combo++;
+            int points = Scenario.Cards[cardIndex].GetPoints(Multiplier, secondsLeft);
+            score += points;
+            ResultText = "+" + points + (combo > 1 ? "   COMBO x" + Multiplier : "");
+
+            if (combo % 3 == 0 && lives < MaxLives)   // Bayanihan Bonus
+            {
+                lives++;
+                ResultText += "   BAYANIHAN BONUS +1 PUSO";
+            }
+
+            Target.Rescued = true;
+        }
+
+        private void ApplyPwedeNaResult()
+        {
+            score += 40;
+            ResultText = "+40   (combo reset)";
+            Target.Rescued = true;
+        }
+
+        private void ApplySablayResult()
+        {
+            lives--;
+            ResultText = "-1 PUSO   (subukan ulit)";
+            Player.MoveTo(prevX, prevY);   // balik sa dating tile
         }
 
         // tinatawag pagkatapos pindutin ang TULOY

@@ -5,26 +5,26 @@ using System.Drawing.Drawing2D;
 
 namespace HandaKaNaBa
 {
-    static class Program
+    static class Program // Static means this startup helper is used directly, without creating a Program object.
     {
         [STAThread]
         static void Main()
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            Application.Run(new MainForm()); // Start the Windows Forms message loop and show the main window.
         }
     }
 
-    public class MainForm : Form
+    public class MainForm : Form // Inherits the standard Windows window behavior from Form.
     {
         private const int TILE = 48;
         private const int LEFT = 16;
         private const int TOP = 72;   // sa ilalim ng HUD
 
-        private GameEngine engine = new GameEngine();
+        private GameEngine engine = new GameEngine(); // MainForm asks the engine for rules; it does not calculate the rules itself.
         private UIManager ui;
-        private System.Windows.Forms.Timer gameLoop = new System.Windows.Forms.Timer();
+        private System.Windows.Forms.Timer gameLoop = new System.Windows.Forms.Timer(); // Timer sends a Tick event repeatedly while running.
         private Dictionary<string, Image> sprites = new Dictionary<string, Image>();
         private Font hintFont = new Font("Segoe UI", 10, FontStyle.Bold);
         private int frame;
@@ -43,7 +43,7 @@ namespace HandaKaNaBa
             ui = new UIManager(this, engine);
 
             gameLoop.Interval = 100;   // 1 tick = 100 ms
-            gameLoop.Tick += GameLoop_Tick;
+            gameLoop.Tick += GameLoop_Tick; // Subscribe: call this method each time the timer raises Tick.
             gameLoop.Start();
         }
 
@@ -65,7 +65,7 @@ namespace HandaKaNaBa
         }
 
         // ProcessCmdKey: nakikita nito ang lahat ng key kahit may button na naka-focus
-        protected override bool ProcessCmdKey(ref Message msg, Keys key)
+        protected override bool ProcessCmdKey(ref Message msg, Keys key) // Override lets this form handle keys before default window behavior.
         {
             if (engine.State == GameState.Walking)
             {
@@ -81,7 +81,7 @@ namespace HandaKaNaBa
             return base.ProcessCmdKey(ref msg, key);
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnPaint(PaintEventArgs e) // Windows Forms calls this when the window needs to be drawn again.
         {
             base.OnPaint(e);
             if (engine.Player == null) return;
@@ -111,7 +111,7 @@ namespace HandaKaNaBa
                     else if (engine.Map.IsWarning(x, y))
                     {
                         if (elNino)   // El Niño: unti-unting nagiging kayumanggi ang damo
-                            using (var dry = new SolidBrush(Color.FromArgb(150, 160, 110, 40))) g.FillRectangle(dry, r);
+                            using (var dry = new SolidBrush(Color.FromArgb(150, 160, 110, 40))) g.FillRectangle(dry, r); // using releases drawing resources after use.
                         else if (blink)   // ibang sakuna: kumikislap na pula
                             using (var red = new SolidBrush(Color.FromArgb(120, 255, 60, 60))) g.FillRectangle(red, r);
                     }
