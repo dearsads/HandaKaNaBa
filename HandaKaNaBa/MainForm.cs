@@ -444,8 +444,6 @@ namespace HandaKaNaBa
             else
                 hint = "Sagipin sina Lola, Bunso at Bantay. Iwasan ang kumikislap!";
 
-            TextRenderer.DrawText(g, hint, hintFont, new Rectangle(0, TOP + TILE * 12 + 8, ClientSize.Width, 24),
-                UIManager.Yellow, TextFormatFlags.HorizontalCenter);
             g.Restore(worldState);
         }
 

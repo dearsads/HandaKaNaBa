@@ -1,148 +1,316 @@
-// UIManager.cs - Members 3 and 4 (Screens, timer, menu, HUD, and interface polish).
-// The UI presents the GameEngine state; gameplay rules remain inside GameEngine.
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+
 namespace HandaKaNaBa
 {
+    public class PixelLabel : Label
+    {
+        public Color FaceColor = Color.Transparent;
+        public int BorderSize = 0;
+        public bool Shadow = false;
+        public bool TextShadow = false;
+
+        public PixelLabel()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.ResizeRedraw, true);
+            BackColor = Color.Transparent;
+        }
+
+        private static StringFormat FormatFor(ContentAlignment a)
+        {
+            var sf = new StringFormat(StringFormatFlags.NoClip);
+
+            switch (a)
+            {
+                case ContentAlignment.TopLeft:
+                case ContentAlignment.TopCenter:
+                case ContentAlignment.TopRight:
+                    sf.LineAlignment = StringAlignment.Near; break;
+                case ContentAlignment.BottomLeft:
+                case ContentAlignment.BottomCenter:
+                case ContentAlignment.BottomRight:
+                    sf.LineAlignment = StringAlignment.Far; break;
+                default:
+                    sf.LineAlignment = StringAlignment.Center; break;
+            }
+
+            switch (a)
+            {
+                case ContentAlignment.TopLeft:
+                case ContentAlignment.MiddleLeft:
+                case ContentAlignment.BottomLeft:
+                    sf.Alignment = StringAlignment.Near; break;
+                case ContentAlignment.TopRight:
+                case ContentAlignment.MiddleRight:
+                case ContentAlignment.BottomRight:
+                    sf.Alignment = StringAlignment.Far; break;
+                default:
+                    sf.Alignment = StringAlignment.Center; break;
+            }
+
+            return sf;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            g.SmoothingMode = SmoothingMode.None;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+
+            int s = Shadow ? 5 : 0;
+            Rectangle face = new Rectangle(0, 0, Width - s, Height - s);
+
+            if (Shadow)
+            {
+                using (var b = new SolidBrush(UIManager.Ink))
+                    g.FillRectangle(b, s, s, face.Width, face.Height);
+            }
+
+            if (FaceColor != Color.Transparent)
+            {
+                using (var b = new SolidBrush(FaceColor))
+                    g.FillRectangle(b, face);
+            }
+
+            if (BorderSize > 0)
+            {
+                using (var b = new SolidBrush(UIManager.Ink))
+                {
+                    g.FillRectangle(b, face.X, face.Y, face.Width, BorderSize);
+                    g.FillRectangle(b, face.X, face.Bottom - BorderSize, face.Width, BorderSize);
+                    g.FillRectangle(b, face.X, face.Y, BorderSize, face.Height);
+                    g.FillRectangle(b, face.Right - BorderSize, face.Y, BorderSize, face.Height);
+                }
+            }
+
+            var textRect = new RectangleF(
+                face.X + BorderSize + Padding.Left,
+                face.Y + BorderSize + Padding.Top,
+                face.Width - BorderSize * 2 - Padding.Horizontal,
+                face.Height - BorderSize * 2 - Padding.Vertical);
+
+            using (var sf = FormatFor(TextAlign))
+            {
+                if (TextShadow)
+                {
+                    var r2 = textRect;
+                    r2.Offset(4, 4);
+                    using (var b = new SolidBrush(UIManager.Ink))
+                        g.DrawString(Text, Font, b, r2, sf);
+                }
+
+                using (var b = new SolidBrush(ForeColor))
+                    g.DrawString(Text, Font, b, textRect, sf);
+            }
+        }
+    }
+
+    public class PixelButton : Button
+    {
+        public Color FaceColor = Color.White;
+        public int BorderThickness = 4;
+
+        private bool hover, pressed;
+        private const int Depth = 6;
+
+        public PixelButton()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.ResizeRedraw, true);
+
+            BackColor = Color.Transparent;
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            TabStop = false;
+            Cursor = Cursors.Hand;
+        }
+
+        protected override bool ShowFocusCues { get { return false; } }
+
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; pressed = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { pressed = true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            g.SmoothingMode = SmoothingMode.None;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+
+            int o = pressed ? Depth - 2 : 0;
+            Rectangle face = new Rectangle(o, o, Width - Depth, Height - Depth);
+
+
+            using (var b = new SolidBrush(UIManager.Ink))
+                g.FillRectangle(b, Depth, Depth, Width - Depth, Height - Depth);
+
+            // face (brighter on hover)
+            Color fill = hover && !pressed
+                ? ControlPaint.Light(FaceColor, 0.35f)
+                : FaceColor;
+
+            using (var b = new SolidBrush(fill))
+                g.FillRectangle(b, face);
+
+            // chunky border
+            int t = BorderThickness;
+            using (var b = new SolidBrush(UIManager.Ink))
+            {
+                g.FillRectangle(b, face.X, face.Y, face.Width, t);
+                g.FillRectangle(b, face.X, face.Bottom - t, face.Width, t);
+                g.FillRectangle(b, face.X, face.Y, t, face.Height);
+                g.FillRectangle(b, face.Right - t, face.Y, t, face.Height);
+            }
+
+            var textRect = new RectangleF(
+                face.X + t + 2, face.Y + t + 2,
+                face.Width - (t + 2) * 2, face.Height - (t + 2) * 2);
+
+            using (var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            })
+            using (var b = new SolidBrush(ForeColor))
+            {
+                g.DrawString(Text, Font, b, textRect, sf);
+            }
+        }
+    }
+
+    // =====================================================================
+    //  UI MANAGER
+    // =====================================================================
+
     public class UIManager
     {
-        // Shared pop-art palette. MainForm also uses Ink and Yellow when drawing the map.
+        // ---- Palette ----
         public static readonly Color Ink = Color.FromArgb(17, 17, 17);
-        public static readonly Color Cream = Color.FromArgb(255, 247, 214);
-        public static readonly Color Yellow = Color.FromArgb(253, 224, 71);
-        public static readonly Color Cyan = Color.FromArgb(34, 211, 238);
-        public static readonly Color Pink = Color.FromArgb(244, 114, 182);
-        public static readonly Color Blue = Color.FromArgb(96, 165, 250);
-        public static readonly Color Orange = Color.FromArgb(251, 146, 60);
-        public static readonly Color Green = Color.FromArgb(52, 211, 153);
+        public static readonly Color Blue = ColorTranslator.FromHtml("#2391FF");
+        public static readonly Color Yellow = ColorTranslator.FromHtml("#FFF83F");
+        public static readonly Color Gold = ColorTranslator.FromHtml("#FFCD54");
+        public static readonly Color Red = ColorTranslator.FromHtml("#F70063");
 
         public const int PanicSeconds = 20;
-        private const int PanicWarningSeconds = 3;
 
-        private readonly Form form;
-        private readonly GameEngine engine;
+        private Form form;
+        private GameEngine engine;
 
         private Panel menuPanel, hudPanel, encounterPanel, endPanel;
-        private Label lblHearts, lblStatus, lblTimer, lblWho, lblScenario;
-        private Label lblResult, lblEndTitle, lblStars;
-        private readonly Button[] cardButtons = new Button[3];
-        private Button btnContinue;
+        private PixelLabel lblHearts, lblName, lblSagip, lblScore, lblCombo, lblTime;
+        private PixelLabel lblTimer, lblWho;
+        private PixelLabel lblScenario, lblResult, lblEndTitle, lblStars;
+
+        private PixelButton[] cardButtons = new PixelButton[3];
+        private PixelButton btnContinue;
         private TextBox txtReport;
-        private Panel rescueProgressTrack, rescueProgressFill;
 
-        private readonly System.Windows.Forms.Timer presentationTimer = new System.Windows.Forms.Timer
-        {
-            Interval = 110
-        };
-
-        private bool revealingCards;
-        private bool revealingStars;
-        private int cardRevealStep;
-        private int selectedCardIndex = -1;
-        private int starsRevealed;
-        private int targetStars;
-        private int encounterSlideStep = 4;
-        private int previousLives = -1;
-        private int previousScore = -1;
-        private int heartPulseFrames;
-        private int scorePulseFrames;
-
-        private readonly System.Windows.Forms.Timer panicTimer = new System.Windows.Forms.Timer
-        {
-            Interval = 1000
-        };
+        private System.Windows.Forms.Timer panicTimer =
+            new System.Windows.Forms.Timer { Interval = 1000 };
 
         private int timeLeft;
         private bool picked;
 
         public UIManager(Form form, GameEngine engine)
         {
-            this.form = form ?? throw new ArgumentNullException(nameof(form));
-            this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
+            this.form = form;
+            this.engine = engine;
 
             BuildMenu();
             BuildHud();
             BuildEncounter();
             BuildEnd();
 
-            // The engine remains the authority. The UI only reacts to its events.
             engine.Changed += UpdateHud;
             engine.EncounterStarted += ShowEncounter;
             engine.Ended += ShowEnd;
+
             panicTimer.Tick += PanicTick;
-            presentationTimer.Tick += PresentationTick;
 
             ShowOnly(menuPanel);
         }
 
-        // -----------------------------------------------------------------
-        // Shared UI helpers
-        // -----------------------------------------------------------------
+        // ---------------- FONTS ----------------
 
-        private Label MakeLabel(
+        private static bool? pixelInstalled;
+
+        private static bool IsPixelInstalled()
+        {
+            if (pixelInstalled == null)
+            {
+                using (var fonts = new InstalledFontCollection())
+                {
+                    pixelInstalled = fonts.Families.Any(f =>
+                        string.Equals(f.Name, "Pixelify Sans",
+                            StringComparison.OrdinalIgnoreCase));
+                }
+
+        private PixelLabel MakeLabel(
             Control parent,
             string text,
-            int x,
-            int y,
-            int width,
-            int height,
+            int x, int y, int w, int h,
             Font font,
-            Color back)
+            Color face,
+            int border = 0,
+            bool shadow = false)
         {
-            var label = new Label
+            var lbl = new PixelLabel
             {
                 Text = text,
                 Location = new Point(x, y),
-                Size = new Size(width, height),
+                Size = new Size(w, h),
                 Font = font,
-                BackColor = back,
+                FaceColor = face,
+                BorderSize = border,
+                Shadow = shadow,
                 ForeColor = Ink,
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoEllipsis = true,
-                UseMnemonic = false
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
-            parent.Controls.Add(label);
-            return label;
+            parent.Controls.Add(lbl);
+            return lbl;
         }
 
-        private Button MakeButton(
+        private PixelButton MakeButton(
             Control parent,
             string text,
-            int x,
-            int y,
-            int width,
-            int height,
-            Color back,
+            int x, int y, int w, int h,
+            Color face,
             Font font)
         {
-            var button = new Button
+            var btn = new PixelButton
             {
                 Text = text,
                 Location = new Point(x, y),
-                Size = new Size(width, height),
+                Size = new Size(w, h),
                 Font = font,
-                BackColor = back,
-                ForeColor = Ink,
-                FlatStyle = FlatStyle.Flat,
-                UseVisualStyleBackColor = false,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Cursor = Cursors.Hand,
-                TabStop = false,
-                UseMnemonic = false,
-                Padding = new Padding(6)
+                FaceColor = face,
+                ForeColor = Ink
             };
 
-            button.FlatAppearance.BorderSize = 4;
-            button.FlatAppearance.BorderColor = Ink;
-            button.FlatAppearance.MouseOverBackColor = AdjustColor(back, 18);
-            button.FlatAppearance.MouseDownBackColor = AdjustColor(back, -22);
-
-            parent.Controls.Add(button);
-            return button;
+            parent.Controls.Add(btn);
+            return btn;
         }
 
-        private Panel MakePanel(Color back, Point location, Size size, DockStyle dock)
+        private Panel MakePanel(
+            Color back,
+            Point location,
+            Size size,
+            DockStyle dock)
         {
-            var panel = new Panel
+            var p = new Panel
             {
                 BackColor = back,
                 Location = location,
@@ -151,66 +319,95 @@ namespace HandaKaNaBa
                 Visible = false
             };
 
-            panel.Paint += Halftone;
-            form.Controls.Add(panel);
-            return panel;
+            form.Controls.Add(p);
+            return p;
         }
 
-        private static Color AdjustColor(Color color, int amount)
+        // thick pixel frame around a panel
+        private static void AddFrame(Panel p, int thickness)
         {
-            return Color.FromArgb(
-                color.A,
-                Math.Clamp(color.R + amount, 0, 255),
-                Math.Clamp(color.G + amount, 0, 255),
-                Math.Clamp(color.B + amount, 0, 255));
-        }
-
-        private static Font Impact(float size) => new Font("Impact", size);
-
-        private static Font Segoe(float size, FontStyle style = FontStyle.Bold) =>
-            new Font("Segoe UI", size, style);
-
-        // Subtle comic-book halftone texture used by the menu, encounter, and end panels.
-        private void Halftone(object sender, PaintEventArgs e)
-        {
-            Control control = (Control)sender;
-            using (var dot = new SolidBrush(Color.FromArgb(38, Ink)))
+            p.Paint += (s, e) =>
             {
-                for (int y = 0; y < control.Height; y += 18)
+                using (var b = new SolidBrush(Ink))
                 {
-                    int offset = (y / 18) % 2 == 0 ? 0 : 9;
-                    for (int x = offset; x < control.Width; x += 18)
-                        e.Graphics.FillEllipse(dot, x, y, 3, 3);
-                }
-            }
+                    var r = p.ClientRectangle;
+                    e.Graphics.FillRectangle(b, 0, 0, r.Width, thickness);
+                    e.Graphics.FillRectangle(b, 0, r.Height - thickness, r.Width, thickness);
+                    e.Graphics.FillRectangle(b, 0, 0, thickness, r.Height);
+                    e.Graphics.FillRectangle(b, r.Width - thickness, 0, thickness, r.Height);
+        }
+            };
         }
 
-        private void ShowOnly(Panel panel)
+        private void ShowOnly(Panel p)
         {
-            menuPanel.Visible = panel == menuPanel;
-            hudPanel.Visible = panel == hudPanel;
-            endPanel.Visible = panel == endPanel;
+            menuPanel.Visible = p == menuPanel;
+            hudPanel.Visible = p == hudPanel;
+            endPanel.Visible = p == endPanel;
             encounterPanel.Visible = false;
-            panel.BringToFront();
+
+            p.BringToFront();
         }
 
-        // -----------------------------------------------------------------
-        // Main menu
-        // -----------------------------------------------------------------
+        // ---------------- MENU ----------------
 
         private void BuildMenu()
         {
-            menuPanel = MakePanel(Cyan, Point.Empty, Size.Empty, DockStyle.Fill);
+            menuPanel = MakePanel(
+                Blue,
+                Point.Empty,
+                Size.Empty,
+                DockStyle.Fill);
 
-            Label title = MakeLabel(
-                menuPanel, "HANDA KA NA BA?",
-                32, 48, 544, 92, Impact(46), Color.Transparent);
-            title.ForeColor = Pink;
+            string backgroundPath = Path.Combine(
+                Application.StartupPath,
+                "Assets",
+                "menu-background.png");
 
-            Label subtitle = MakeLabel(
-                menuPanel, "PUMILI NG SAKUNA",
-                144, 154, 320, 40, Impact(19), Ink);
-            subtitle.ForeColor = Color.White;
+            if (File.Exists(backgroundPath))
+            {
+                using (Image image = Image.FromFile(backgroundPath))
+                {
+                    menuPanel.BackgroundImage = new Bitmap(image);
+                }
+            }
+
+                menuPanel.BackgroundImageLayout = ImageLayout.Stretch;
+        }
+
+            string titlePath = Path.Combine(
+                Application.StartupPath,
+                "Assets",
+                "menu title.png");
+
+            if (File.Exists(titlePath))
+        {
+                var titleImage = new PictureBox
+                {
+                    Location = new Point(24, 8),
+                    Size = new Size(600, 240),    
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.Transparent
+                };
+
+                using (Image image = Image.FromFile(titlePath))
+                {
+                    titleImage.Image = new Bitmap(image);
+                }
+
+                menuPanel.Controls.Add(titleImage);
+            }
+
+            var heading = MakeLabel(
+                menuPanel,
+                "PUMILI NG SAKUNA",
+                84, 254, 440, 52,
+                Pixel(22),
+                Red,
+                4,
+                true);
+
+            heading.ForeColor = Color.White;
 
             string[] names =
             {
@@ -219,121 +416,103 @@ namespace HandaKaNaBa
                 "EL NIÑO\n\nHARD"
             };
 
-            Color[] colors = { Blue, Orange, Yellow };
+            Color[] colors = { Yellow, Gold, Red };
 
             for (int i = 0; i < 3; i++)
             {
-                Difficulty difficulty = (Difficulty)i;
-                Button button = MakeButton(
+                Difficulty d = (Difficulty)i;
+
+                var btn = MakeButton(
                     menuPanel,
                     names[i],
                     16 + i * 200,
-                    224,
-                    176,
-                    184,
+                    320,
+                    182,
+                    170,
                     colors[i],
-                    Impact(25));
+                    Pixel(21));
 
-                button.Click += (sender, e) => StartGame(difficulty);
+                if (i == 2)
+                    btn.ForeColor = Color.White;
+
+                btn.Click += (s, e) => StartGame(d);
             }
 
             MakeLabel(
                 menuPanel,
-                "WASD / Arrows: gumalaw     1, 2, 3: pumili ng card\n" +
-                "Sagipin sina Lola, Bunso at Bantay, tapos tumakbo sa EVAC!\n" +
-                "TSUNAMI: umakyat o sumilong 1-3 tiles sa likod ng pader/burol sa hilera mo." +
-                "BABALA: ang magkakadugtong na bahay ay may 2 alon lang bago gumuho.",
-                16, 432, 576, 94, Segoe(10.5f), Color.Transparent);
+                "Controls:" +
+                "WASD or Arrows: Move\n" +
+                "1, 2, 3: Choose Cards\n" +
+                "Save your family, then evacuate!",
+                16, 510, 576, 96,
+                Pixel(13),
+                Yellow,
+                4,
+                true);
         }
 
-        private void StartGame(Difficulty difficulty)
+        private void StartGame(Difficulty d)
         {
-            panicTimer.Stop();
-            presentationTimer.Stop();
-            revealingCards = false;
-            revealingStars = false;
-            heartPulseFrames = 0;
-            scorePulseFrames = 0;
-            previousLives = -1;
-            previousScore = -1;
-            picked = false;
+            engine.StartLevel(d);
 
-            engine.StartLevel(difficulty);
             ShowOnly(hudPanel);
             UpdateHud();
 
-            // Keep keyboard input with the game instead of a menu button.
             form.ActiveControl = null;
             form.Focus();
         }
 
-        // -----------------------------------------------------------------
-        // Gameplay HUD
-        // -----------------------------------------------------------------
+        // ---------------- HUD ----------------
 
         private void BuildHud()
         {
-            hudPanel = MakePanel(
-                Cream,
-                Point.Empty,
-                new Size(form.ClientSize.Width, 64),
-                DockStyle.Top);
-            hudPanel.Height = 64;
-
-            lblHearts = MakeLabel(
-                hudPanel, "",
-                8, 7, 158, 50,
-                new Font("Segoe UI Symbol", 23, FontStyle.Bold),
-                Color.Transparent);
-            lblHearts.ForeColor = Pink;
-
-            lblStatus = MakeLabel(
-                hudPanel, "",
-                170, 5, 428, 38,
-                Impact(14),
-                Yellow);
-            lblStatus.ForeColor = Ink;
-
-            rescueProgressTrack = new Panel
+            hudPanel = new Panel
             {
-                Location = new Point(172, 48),
-                Size = new Size(420, 7),
-                BackColor = Color.FromArgb(65, Ink),
-                BorderStyle = BorderStyle.FixedSingle
+                BackColor = Gold,
+                Dock = DockStyle.Top,
+                Height = 64,
+                Visible = false
             };
-            rescueProgressFill = new Panel
+
+            // chunky bottom line
+            hudPanel.Paint += (s, e) =>
             {
-                Location = Point.Empty,
-                Size = new Size(0, 7),
-                BackColor = Green
+                using (var b = new SolidBrush(Ink))
+                    e.Graphics.FillRectangle(b, 0, hudPanel.Height - 4, hudPanel.Width, 4);
             };
-            rescueProgressTrack.Controls.Add(rescueProgressFill);
-            hudPanel.Controls.Add(rescueProgressTrack);
+
+            form.Controls.Add(hudPanel);
+
+            lblHearts = MakeLabel(hudPanel, "", 8, 4, 118, 52,
+                new Font("Pixelify Sans", 18, FontStyle.Bold), Ink, 3);
+            lblHearts.ForeColor = Red;
+
+            lblName = MakeHudCell(134, 120);
+            lblSagip = MakeHudCell(260, 80);
+            lblScore = MakeHudCell(346, 100);
+            lblCombo = MakeHudCell(452, 62);
+            lblTime = MakeHudCell(520, 72);
+        }
+
+        private PixelLabel MakeHudCell(int x, int w)
+        {
+            return MakeLabel(hudPanel, "", x, 4, w, 52, Pixel(12), Yellow, 3);
         }
 
         private void UpdateHud()
         {
-            int lives = Math.Clamp(engine.Lives, 0, GameEngine.MaxLives);
-            lblHearts.Text = new string('♥', lives) +
-                             new string('♡', GameEngine.MaxLives - lives);
+            int lives = Math.Max(0, engine.Lives);
 
-            string disasterName = engine.Map.Current?.Name ?? engine.Disaster.ToString().ToUpper();
-            lblStatus.Text =
-                disasterName + "  •  SAGIP " + engine.RescuedCount + "/3  •  " +
-                engine.Score + " PTS  •  COMBO x" + engine.Multiplier + "  •  " +
-                engine.Seconds + "s";
+            lblHearts.Text =
+                new string('\u2665', lives) +
+                new string('\u2661', GameEngine.MaxLives - lives);
 
-            rescueProgressFill.Width = (int)(420f * engine.RescuedCount / 3f);
-
-            if (previousLives >= 0 && lives != previousLives)
-                heartPulseFrames = 6;
-            if (previousScore >= 0 && engine.Score != previousScore)
-                scorePulseFrames = 6;
-
-            previousLives = lives;
-            previousScore = engine.Score;
-            if (heartPulseFrames > 0 || scorePulseFrames > 0)
-                StartPresentationTimer();
+            lblName.Text = "SAKUNA\n" + engine.Map.Current.Name;
+            lblSagip.Text = "SAGIP\n" + engine.RescuedCount + "/3";
+            lblScore.Text = "SCORE\n" + engine.Score;
+            lblCombo.Text = "COMBO\nx" + engine.Multiplier;
+            lblCombo.Font = new Font("Pixelify Sans", 10, FontStyle.Bold);
+            lblTime.Text = "ORAS\n" + engine.Seconds + "s";
         }
 
         public void Tick()
@@ -342,72 +521,87 @@ namespace HandaKaNaBa
                 UpdateHud();
         }
 
-        // -----------------------------------------------------------------
-        // Rescue encounter and 20-second decision timer
-        // -----------------------------------------------------------------
+        // ---------------- ENCOUNTER + PANIC TIMER ----------------
 
         private void BuildEncounter()
         {
             encounterPanel = MakePanel(
-                Yellow,
+                Gold,
                 new Point(24, 80),
                 new Size(560, 560),
                 DockStyle.None);
 
+            AddFrame(encounterPanel, 6);
+
             lblTimer = MakeLabel(
-                encounterPanel, PanicSeconds.ToString(),
-                16, 12, 100, 90,
-                Impact(54),
-                Color.Transparent);
+                encounterPanel,
+                "10",
+                20, 16, 104, 80,
+                Pixel(50),
+                Yellow,
+                4,
+                true);
 
             lblWho = MakeLabel(
-                encounterPanel, "",
-                124, 25, 420, 62,
-                Impact(26),
-                Pink);
+                encounterPanel,
+                "",
+                136, 16, 404, 80,
+                Pixel(24),
+                Blue,
+                4,
+                true);
+
+            lblWho.ForeColor = Color.White;
+            lblWho.TextShadow = true;
 
             lblScenario = MakeLabel(
-                encounterPanel, "",
-                16, 112, 528, 104,
-                Segoe(11),
-                Ink);
+                encounterPanel,
+                "",
+                20, 104, 520, 116,
+                Pixel(15),
+                Ink,
+                4);
+
             lblScenario.ForeColor = Color.White;
-            lblScenario.TextAlign = ContentAlignment.MiddleLeft;
-            lblScenario.Padding = new Padding(12);
+            lblScenario.Padding = new Padding(8);
 
             for (int i = 0; i < 3; i++)
             {
-                int cardIndex = i;
+                int index = i;
+
                 cardButtons[i] = MakeButton(
                     encounterPanel,
                     "",
-                    16 + i * 182,
-                    228,
-                    164,
-                    196,
+                    20 + i * 180,
+                    230,
+                    168,
+                    186,
                     Color.White,
-                    Segoe(10));
+                    Pixel(12));
 
-                cardButtons[i].Click += (sender, e) => Choose(cardIndex);
+                cardButtons[i].Click += (s, e) => Choose(index);
             }
 
             lblResult = MakeLabel(
-                encounterPanel, "",
-                16, 436, 400, 110,
-                Segoe(9.5f, FontStyle.Regular),
-                Color.Transparent);
+                encounterPanel,
+                "",
+                20, 426, 396, 120,
+                Pixel(12),
+                Color.White,
+                4);
+
             lblResult.TextAlign = ContentAlignment.TopLeft;
-            lblResult.ForeColor = Ink;
-            lblResult.Padding = new Padding(4, 2, 4, 2);
+            lblResult.Padding = new Padding(6);
 
             btnContinue = MakeButton(
                 encounterPanel,
                 "TULOY ▶",
-                426, 452, 118, 76,
+                426, 436, 114, 100,
                 Ink,
-                Impact(18));
+                Pixel(17));
+
             btnContinue.ForeColor = Yellow;
-            btnContinue.Click += (sender, e) => Continue();
+            btnContinue.Click += (s, e) => Continue();
         }
 
         private void ShowEncounter()
@@ -417,49 +611,51 @@ namespace HandaKaNaBa
 
             lblTimer.Text = timeLeft.ToString();
             lblTimer.ForeColor = Ink;
-            lblTimer.BackColor = Color.Transparent;
-            lblWho.Text = "SAGIPIN SI " + engine.Target.Name.ToUpper() + "!";
+            lblTimer.FaceColor = Yellow;
+            lblTimer.Invalidate();
+
+            lblWho.Text =
+                "SAGIPIN SI " + engine.Target.Name.ToUpper() + "!";
+
             lblScenario.Text = engine.Scenario.Text;
 
             for (int i = 0; i < 3; i++)
             {
-                Card card = engine.Scenario.Cards[i];
-                cardButtons[i].Text = "[" + (i + 1) + "]\n\n" +
-                                      card.Title + "\n\n" + card.Hint;
-                cardButtons[i].BackColor = Color.White;
-                cardButtons[i].ForeColor = Ink;
-                cardButtons[i].Enabled = true;
-                cardButtons[i].FlatAppearance.BorderSize = 4;
+                Card c = engine.Scenario.Cards[i];
+
+                cardButtons[i].Text =
+                    "[" + (i + 1) + "]\n" +
+                    c.Title + "\n\n" + c.Hint;
+
+                cardButtons[i].FaceColor = Color.White;
+                cardButtons[i].BorderThickness = 4;
+                cardButtons[i].Invalidate();
             }
 
             lblResult.Visible = false;
             btnContinue.Visible = false;
 
-            encounterPanel.Location = new Point(24, 100);
-            encounterSlideStep = 0;
             encounterPanel.Visible = true;
             encounterPanel.BringToFront();
-            form.ActiveControl = null;
 
-            panicTimer.Stop();
+            form.ActiveControl = null;
             panicTimer.Start();
-            StartPresentationTimer();
         }
 
         private void PanicTick(object sender, EventArgs e)
         {
-            timeLeft = Math.Max(0, timeLeft - 1);
-            lblTimer.Text = timeLeft.ToString();
+            timeLeft--;
 
-            if (timeLeft <= PanicWarningSeconds)
+            lblTimer.Text = Math.Max(0, timeLeft).ToString();
+
+            if (timeLeft <= 3)
             {
-                lblTimer.ForeColor = Color.Red;
-                lblTimer.BackColor = timeLeft % 2 == 0
-                    ? Color.FromArgb(115, Pink)
-                    : Color.Transparent;
+                lblTimer.FaceColor = Red;         
+                lblTimer.ForeColor = Color.White;
+                lblTimer.Invalidate();
             }
 
-            if (timeLeft == 0)
+            if (timeLeft <= 0)
                 Choose(-1);
         }
 
@@ -473,17 +669,14 @@ namespace HandaKaNaBa
 
             engine.ChooseCard(index, Math.Max(0, timeLeft));
 
-            // Resolve the answer immediately, then reveal the three cards in sequence.
-            selectedCardIndex = index;
-            cardRevealStep = 0;
-            revealingCards = true;
-            lblResult.Visible = false;
-            btnContinue.Visible = false;
-
-            for (int i = 0; i < cardButtons.Length; i++)
+            for (int i = 0; i < 3; i++)
             {
-                cardButtons[i].Enabled = false;
-                cardButtons[i].FlatAppearance.BorderSize = 4;
+                Card c = engine.Scenario.Cards[i];
+
+                cardButtons[i].Text = c.Label + "\n\n" + c.Title;
+                cardButtons[i].FaceColor = c.Color;
+                cardButtons[i].BorderThickness = i == index ? 8 : 3;
+                cardButtons[i].Invalidate();
             }
 
             string reaction = index >= 0
@@ -491,15 +684,16 @@ namespace HandaKaNaBa
                 : "Na-freeze ka! Naubos ang oras.";
 
             lblResult.Text =
-                reaction + "\n\nARAL: " + engine.Scenario.BestCard.Lesson +
-                "\n\n" + engine.ResultText;
+                reaction + "\n\nAral: " +
+                engine.Scenario.BestCard.Lesson + "\n" +
+                engine.ResultText;
 
-            StartPresentationTimer();
+            btnContinue.Visible = true;
         }
 
         private void Continue()
         {
-            if (!picked || !btnContinue.Visible || revealingCards)
+            if (!picked)
                 return;
 
             encounterPanel.Visible = false;
@@ -509,28 +703,19 @@ namespace HandaKaNaBa
             form.Focus();
         }
 
-        // While an encounter is open: 1-3 choose a card; Enter/Space continues.
         public bool HandleKey(Keys key)
         {
             if (!encounterPanel.Visible)
                 return false;
 
-            if (!picked)
+            if (!picked && key >= Keys.D1 && key <= Keys.D3)
             {
-                if (key >= Keys.D1 && key <= Keys.D3)
-                {
-                    Choose(key - Keys.D1);
+                Choose((int)key - (int)Keys.D1);
                     return true;
                 }
 
-                if (key >= Keys.NumPad1 && key <= Keys.NumPad3)
+            if (picked && (key == Keys.Enter || key == Keys.Space))
                 {
-                    Choose(key - Keys.NumPad1);
-                    return true;
-                }
-            }
-            else if (btnContinue.Visible && (key == Keys.Enter || key == Keys.Space))
-            {
                 Continue();
                 return true;
             }
@@ -538,118 +723,32 @@ namespace HandaKaNaBa
             return false;
         }
 
-        private void StartPresentationTimer()
-        {
-            if (!presentationTimer.Enabled)
-                presentationTimer.Start();
-        }
-
-        // Presentation-only animation: encounter panel slide, sequential card reveal,
-        // heart/score feedback, and star-by-star end-screen reveal.
-        private void PresentationTick(object sender, EventArgs e)
-        {
-            bool hasMoreAnimation = false;
-
-            if (encounterPanel.Visible && encounterSlideStep < 4)
-            {
-                encounterSlideStep++;
-                int y = 100 - (20 * encounterSlideStep / 4);
-                encounterPanel.Location = new Point(24, y);
-                hasMoreAnimation = true;
-            }
-
-            if (revealingCards)
-            {
-                if (cardRevealStep < cardButtons.Length)
-                {
-                    Card card = engine.Scenario.Cards[cardRevealStep];
-                    Button button = cardButtons[cardRevealStep];
-                    button.Text = card.Label + "\n\n" + card.Title;
-                    button.BackColor = card.Color;
-                    button.ForeColor = Ink;
-                    button.FlatAppearance.BorderSize = cardRevealStep == selectedCardIndex ? 8 : 2;
-                    cardRevealStep++;
-                    hasMoreAnimation = true;
-                }
-                else
-                {
-                    revealingCards = false;
-                    lblResult.Visible = true;
-                    btnContinue.Visible = true;
-                    encounterPanel.Invalidate();
-                }
-            }
-
-            if (revealingStars)
-            {
-                starsRevealed++;
-                lblStars.Text = new string('★', starsRevealed) + new string('☆', 3 - starsRevealed);
-                if (starsRevealed >= targetStars)
-                    revealingStars = false;
-                else
-                    hasMoreAnimation = true;
-            }
-
-            if (heartPulseFrames > 0)
-            {
-                lblHearts.ForeColor = heartPulseFrames % 2 == 0 ? Color.Red : Pink;
-                heartPulseFrames--;
-                hasMoreAnimation = true;
-            }
-            else
-            {
-                lblHearts.ForeColor = Pink;
-            }
-
-            if (scorePulseFrames > 0)
-            {
-                lblStatus.ForeColor = scorePulseFrames % 2 == 0 ? Green : Ink;
-                scorePulseFrames--;
-                hasMoreAnimation = true;
-            }
-            else
-            {
-                lblStatus.ForeColor = Ink;
-            }
-
-            if (!hasMoreAnimation && !revealingCards && !revealingStars &&
-                heartPulseFrames <= 0 && scorePulseFrames <= 0)
-                presentationTimer.Stop();
-        }
-
-        public void Dispose()
-        {
-            panicTimer.Stop();
-            presentationTimer.Stop();
-            engine.Changed -= UpdateHud;
-            engine.EncounterStarted -= ShowEncounter;
-            engine.Ended -= ShowEnd;
-            panicTimer.Tick -= PanicTick;
-            presentationTimer.Tick -= PresentationTick;
-            panicTimer.Dispose();
-            presentationTimer.Dispose();
-        }
-
-        // -----------------------------------------------------------------
-        // End screen and Barangay Assembly Report
-        // -----------------------------------------------------------------
+        // ---------------- END SCREEN + REPORT ----------------
 
         private void BuildEnd()
         {
-            endPanel = MakePanel(Yellow, Point.Empty, Size.Empty, DockStyle.Fill);
+            endPanel = MakePanel(
+                Gold,
+                Point.Empty,
+                Size.Empty,
+                DockStyle.Fill);
 
             lblEndTitle = MakeLabel(
-                endPanel, "",
-                16, 20, 576, 76,
-                Impact(44),
+                endPanel,
+                "",
+                16, 12, 576, 84,
+                Pixel(36),
                 Color.Transparent);
 
+            lblEndTitle.TextShadow = true;
+            lblEndTitle.ForeColor = Color.White;
+
             lblStars = MakeLabel(
-                endPanel, "",
-                16, 96, 576, 56,
-                new Font("Segoe UI Symbol", 32, FontStyle.Bold),
+                endPanel,
+                "",
+                16, 98, 576, 56,
+                new Font("Pixelify Sans", 32, FontStyle.Bold),
                 Color.Transparent);
-            lblStars.ForeColor = Ink;
 
             txtReport = new TextBox
             {
@@ -658,7 +757,7 @@ namespace HandaKaNaBa
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
-                Font = Segoe(10.5f, FontStyle.Regular),
+                Font = Pixel(13, FontStyle.Regular),
                 BackColor = Color.White,
                 ForeColor = Ink,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -666,17 +765,19 @@ namespace HandaKaNaBa
             };
             endPanel.Controls.Add(txtReport);
 
-            Button retryButton = MakeButton(
-                endPanel, "ULITIN",
+            MakeButton(
+                endPanel,
+                "UMULIT",
                 40, 576, 250, 64,
-                Cyan, Impact(24));
-            retryButton.Click += (sender, e) => StartGame(engine.Disaster);
+                Yellow,
+                Pixel(26)).Click += (s, e) => StartGame(engine.Disaster);
 
-            Button menuButton = MakeButton(
-                endPanel, "MENU",
+            MakeButton(
+                endPanel,
+                "MENU",
                 318, 576, 250, 64,
-                Color.White, Impact(24));
-            menuButton.Click += (sender, e) => ShowOnly(menuPanel);
+                Color.White,
+                Pixel(26)).Click += (s, e) => ShowOnly(menuPanel);
         }
 
         private void ShowEnd()
@@ -684,23 +785,34 @@ namespace HandaKaNaBa
             panicTimer.Stop();
 
             bool won = engine.State == GameState.Clear;
-            endPanel.BackColor = won ? Yellow : Pink;
-            lblEndTitle.Text = won ? "NAKALIGTAS!" : "SABLAY! UBOS ANG PUSO";
-            targetStars = won ? engine.Stars : 0;
-            starsRevealed = 0;
-            revealingStars = targetStars > 0;
-            lblStars.Text = won ? new string('☆', 3) : "";
-            encounterSlideStep = 4;
-            if (revealingStars)
-                StartPresentationTimer();
+
+            endPanel.BackColor = won ? Gold : Red;
+
+            lblEndTitle.Text = won
+                ? "NAKALIGTAS!"
+                : "SABLAY! UBOS ANG PUSO";
+
+            lblStars.ForeColor = won ? Ink : Color.White;
+
+            lblStars.Text = won
+                ? new string('★', engine.Stars) +
+                  new string('☆', 3 - engine.Stars)
+                : "";
 
             var lines = new List<string>(engine.Summary)
             {
                 "",
                 "=== BARANGAY ASSEMBLY REPORT ==="
             };
-            lines.Add(engine.Database.GetReport(engine.Disaster, engine.Stars));
-            txtReport.Text = string.Join(Environment.NewLine, lines);
+
+            lines.Add(
+                engine.Database.GetReport(
+                    engine.Disaster,
+                    engine.Stars));
+
+            txtReport.Text = string.Join(
+                Environment.NewLine,
+                lines);
 
             ShowOnly(endPanel);
         }
