@@ -1,4 +1,4 @@
-// GameEngine.cs - Member 1 (Back-end: game flow, entities, and rules)
+// GameEngine.cs - Member 2 (Back-end: grid mechanics, game flow, entities, and rules)
 // Ang "utak" ng laro: player, puso, score, combo, collision at resulta ng cards.
 // Hindi ito nagdo-drawing. Sinasabihan lang nito ang UI gamit ang EVENTS.
 namespace HandaKaNaBa
@@ -75,6 +75,7 @@ namespace HandaKaNaBa
             Map.Load(d);
             lives = MaxLives; score = 0; combo = 0; Ticks = 0; Hits = 0;
             Database.MissedLessons.Clear();
+            Database.Decisions.Clear();
             Player = new Player(Map.Start.X, Map.Start.Y);
             Family.Clear();
             foreach (var spot in Map.FamilySpots)
@@ -136,6 +137,7 @@ namespace HandaKaNaBa
         public CardResult ChooseCard(int index, int secondsLeft)
         {
             CardResult result = Database.CheckAnswer(Scenario, index);
+            Database.RecordDecision(Scenario, index);   // for the end-of-level report
 
             if (result == CardResult.Handa)
             {

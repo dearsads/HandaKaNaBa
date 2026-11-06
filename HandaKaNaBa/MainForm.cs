@@ -1,8 +1,9 @@
-// MainForm.cs - Member 2 (Drawing, input, assets, and visual presentation)
+// MainForm.cs - Member 4 (Front-end: assets, graphics, keyboard input, and integration)
 // Ang nag-iisang window: dito ang game loop, keyboard at pag-drawing ng grid.
 // 16x16 ang pixel art, pinapalaki ng 3x (48x48) gamit ang NearestNeighbor para malinaw pa rin.
 using System.Drawing.Drawing2D;
 using System.Diagnostics;
+using System.Drawing.Text;
 
 namespace HandaKaNaBa
 {
@@ -27,7 +28,11 @@ namespace HandaKaNaBa
         private UIManager ui;
         private System.Windows.Forms.Timer gameLoop = new System.Windows.Forms.Timer();
         private Dictionary<string, Image> sprites = new Dictionary<string, Image>();
-        private Font hintFont = new Font("Segoe UI", 10, FontStyle.Bold);
+        private readonly Font hintFont = PixelFonts.Create(UiStyle.Small);   // same pixel font as the UI
+        private readonly FitCache hintFit = new FitCache();
+        // Short red flash over the map when a life is lost (a hit or a wrong answer).
+        private int hurtAlpha;
+        private int lastLives = -1;
         private int frame;
 
         // Presentation-only movement tween. GameEngine still owns the true grid position.
@@ -91,7 +96,11 @@ namespace HandaKaNaBa
             string folder = Path.Combine(AppContext.BaseDirectory, "Assets");
             if (!Directory.Exists(folder)) return;
             foreach (string file in Directory.GetFiles(folder, "*.png"))
-                sprites[Path.GetFileNameWithoutExtension(file)] = Image.FromFile(file);
+            {
+                string name = Path.GetFileNameWithoutExtension(file);
+                if (name.StartsWith("menu")) continue;   // menu art is loaded by UIManager
+                sprites[name] = Image.FromFile(file);
+            }
         }
 
         private void GameLoop_Tick(object sender, EventArgs e)
@@ -107,6 +116,13 @@ namespace HandaKaNaBa
         // Ordinary movement is animated separately without changing simulation timing.
         private void Engine_Changed()
         {
+            // Red flash on the map whenever a life is lost.
+            if (engine.Ticks == 0 && engine.State == GameState.Walking)
+                lastLives = engine.Lives;
+            else if (lastLives >= 0 && engine.Lives < lastLives)
+                StartHurtFlash();
+            lastLives = engine.Lives;
+
             if (engine.Ticks == 0 && engine.State == GameState.Walking)
             {
                 environmentFrame = 0;
@@ -121,6 +137,15 @@ namespace HandaKaNaBa
             // Ticks == 0 identifies a fresh level; non-walking states include encounter feedback.
             if (engine.State != GameState.Walking || engine.Ticks == 0)
                 SnapPlayerVisualToEngine();
+        }
+
+        private void StartHurtFlash()
+        {
+            var mapArea = new Rectangle(LEFT - 4, TOP - 4, TILE * 12 + 8, TILE * 12 + 8);
+            Tweener.Run(this, "hurt", 380, Ease.OutCubic,
+                p => { hurtAlpha = (int)Math.Round(110 * (1.0 - p)); Invalidate(mapArea); },
+                0,
+                () => { hurtAlpha = 0; Invalidate(mapArea); });
         }
 
         private void Engine_EncounterStarted()
@@ -263,6 +288,7 @@ namespace HandaKaNaBa
                 sprite.Dispose();
 
             hintFont.Dispose();
+            hintFit.Dispose();
             gameLoop.Dispose();
             playerAnimationTimer.Dispose();
             environmentAnimationTimer.Dispose();
@@ -445,6 +471,39 @@ namespace HandaKaNaBa
                 hint = "Sagipin sina Lola, Bunso at Bantay. Iwasan ang kumikislap!";
 
             g.Restore(worldState);
+
+            // The flash and the hint sit outside the earthquake shake, so they stay steady.
+            if (hurtAlpha > 0)
+            {
+                using (var flash = new SolidBrush(Color.FromArgb(hurtAlpha, UIManager.Red)))
+                    g.FillRectangle(flash, LEFT, TOP, TILE * 12, TILE * 12);
+            }
+
+            DrawHint(g, hint);
+        }
+
+        // Bottom hint line in the same pixel font as the UI. A long hint shrinks to fit one line.
+        private void DrawHint(Graphics g, string hint)
+        {
+            var area = new RectangleF(LEFT, TOP + TILE * 12 + 6, TILE * 12, 26);
+            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
+            using (var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+                HotkeyPrefix = HotkeyPrefix.None
+            })
+            {
+                Font f = hintFit.Get(g, hint, hintFont, area.Size, sf, 8f);
+
+                RectangleF shadow = area;
+                shadow.Offset(2, 2);
+                using (var ink = new SolidBrush(UIManager.Ink))
+                    g.DrawString(hint, f, ink, shadow, sf);
+                using (var yellow = new SolidBrush(UIManager.Yellow))
+                    g.DrawString(hint, f, yellow, area, sf);
+            }
         }
 
 

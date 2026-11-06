@@ -1,4 +1,4 @@
-// DisasterManager.cs - Member 1 (Back-end: map and disaster mechanics)
+// DisasterManager.cs - Member 2 (Back-end: 12x12 map and disaster mechanics)
 // Ang 12x12 na mapa at ang tatlong sakuna. 1 game tick = 100 ms.
 namespace HandaKaNaBa
 {
